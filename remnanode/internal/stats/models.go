@@ -1,0 +1,64 @@
+package stats
+
+import "github.com/remnawave/remnanode/internal/xray_client"
+
+// GetSystemStatsResponse represents the response for system stats
+type GetSystemStatsResponse struct {
+	NumGoroutine uint32 `json:"numGoroutine"`
+	NumGC        uint32 `json:"numGC"`
+	Alloc        uint64 `json:"alloc"`
+	TotalAlloc   uint64 `json:"totalAlloc"`
+	Sys          uint64 `json:"sys"`
+	Mallocs      uint64 `json:"mallocs"`
+	Frees        uint64 `json:"frees"`
+	LiveObjects  uint64 `json:"liveObjects"`
+	PauseTotalNs uint64 `json:"pauseTotalNs"`
+	Uptime       uint32 `json:"uptime"`
+}
+
+// GetUserOnlineStatusResponse represents the response for user online status
+type GetUserOnlineStatusResponse struct {
+	Online bool `json:"online"`
+}
+
+// UserStats represents a single user's stats
+type UserStats struct {
+	Username string `json:"username"`
+	Uplink   int64  `json:"uplink"`
+	Downlink int64  `json:"downlink"`
+}
+
+// GetUsersStatsResponse represents the response for all users stats
+type GetUsersStatsResponse struct {
+	Users []UserStats `json:"users"`
+}
+
+// GetInboundStatsResponse represents the response for inbound stats
+type GetInboundStatsResponse struct {
+	Inbound  string `json:"inbound"`
+	Uplink   int64  `json:"uplink"`
+	Downlink int64  `json:"downlink"`
+}
+
+// GetOutboundStatsResponse represents the response for outbound stats
+type GetOutboundStatsResponse struct {
+	Outbound string `json:"outbound"`
+	Uplink   int64  `json:"uplink"`
+	Downlink int64  `json:"downlink"`
+}
+
+// GetAllInboundsStatsResponse represents the response for all inbounds stats
+type GetAllInboundsStatsResponse struct {
+	Inbounds []xray_client.InboundStats `json:"inbounds"`
+}
+
+// GetAllOutboundsStatsResponse represents the response for all outbounds stats
+type GetAllOutboundsStatsResponse struct {
+	Outbounds []xray_client.OutboundStats `json:"outbounds"`
+}
+
+// GetCombinedStatsResponse represents the response for combined stats
+type GetCombinedStatsResponse struct {
+	Inbounds  []xray_client.InboundStats  `json:"inbounds"`
+	Outbounds []xray_client.OutboundStats `json:"outbounds"`
+}
