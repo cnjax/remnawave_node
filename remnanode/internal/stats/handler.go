@@ -44,11 +44,15 @@ func (h *Handler) GetUserOnlineStatus(c *gin.Context) {
 	errors.SendSuccess(c, resp)
 }
 
-// GetUsersStats handles POST /node/stats/users-stats
+// GetUsersStats handles POST /node/stats/get-users-stats
 func (h *Handler) GetUsersStats(c *gin.Context) {
-	reset := c.Query("reset") == "true"
+	var req GetUsersStatsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		return
+	}
 
-	resp, err := h.service.GetUsersStats(reset)
+	resp, err := h.service.GetUsersStats(req.Reset)
 	if err != nil {
 		errors.SendError(c, errors.ErrFailedToGetUsersStats)
 		return
@@ -57,7 +61,7 @@ func (h *Handler) GetUsersStats(c *gin.Context) {
 	errors.SendSuccess(c, resp)
 }
 
-// GetInboundStats handles POST /node/stats/inbound-stats
+// GetInboundStats handles POST /node/stats/get-inbound-stats
 func (h *Handler) GetInboundStats(c *gin.Context) {
 	var req GetInboundStatsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -65,9 +69,7 @@ func (h *Handler) GetInboundStats(c *gin.Context) {
 		return
 	}
 
-	reset := c.Query("reset") == "true"
-
-	resp, err := h.service.GetInboundStats(req.Tag, reset)
+	resp, err := h.service.GetInboundStats(req.Tag, req.Reset)
 	if err != nil {
 		errors.SendError(c, errors.ErrFailedToGetInboundStats)
 		return
@@ -76,7 +78,7 @@ func (h *Handler) GetInboundStats(c *gin.Context) {
 	errors.SendSuccess(c, resp)
 }
 
-// GetOutboundStats handles POST /node/stats/outbound-stats
+// GetOutboundStats handles POST /node/stats/get-outbound-stats
 func (h *Handler) GetOutboundStats(c *gin.Context) {
 	var req GetOutboundStatsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -84,9 +86,7 @@ func (h *Handler) GetOutboundStats(c *gin.Context) {
 		return
 	}
 
-	reset := c.Query("reset") == "true"
-
-	resp, err := h.service.GetOutboundStats(req.Tag, reset)
+	resp, err := h.service.GetOutboundStats(req.Tag, req.Reset)
 	if err != nil {
 		errors.SendError(c, errors.ErrFailedToGetOutboundStats)
 		return
@@ -95,11 +95,15 @@ func (h *Handler) GetOutboundStats(c *gin.Context) {
 	errors.SendSuccess(c, resp)
 }
 
-// GetAllInboundsStats handles POST /node/stats/all-inbounds-stats
+// GetAllInboundsStats handles POST /node/stats/get-all-inbounds-stats
 func (h *Handler) GetAllInboundsStats(c *gin.Context) {
-	reset := c.Query("reset") == "true"
+	var req GetAllInboundsStatsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		return
+	}
 
-	resp, err := h.service.GetAllInboundsStats(reset)
+	resp, err := h.service.GetAllInboundsStats(req.Reset)
 	if err != nil {
 		errors.SendError(c, errors.ErrFailedToGetInboundsStats)
 		return
@@ -108,11 +112,15 @@ func (h *Handler) GetAllInboundsStats(c *gin.Context) {
 	errors.SendSuccess(c, resp)
 }
 
-// GetAllOutboundsStats handles POST /node/stats/all-outbounds-stats
+// GetAllOutboundsStats handles POST /node/stats/get-all-outbounds-stats
 func (h *Handler) GetAllOutboundsStats(c *gin.Context) {
-	reset := c.Query("reset") == "true"
+	var req GetAllOutboundsStatsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		return
+	}
 
-	resp, err := h.service.GetAllOutboundsStats(reset)
+	resp, err := h.service.GetAllOutboundsStats(req.Reset)
 	if err != nil {
 		errors.SendError(c, errors.ErrFailedToGetOutboundsStats)
 		return
@@ -121,11 +129,15 @@ func (h *Handler) GetAllOutboundsStats(c *gin.Context) {
 	errors.SendSuccess(c, resp)
 }
 
-// GetCombinedStats handles POST /node/stats/combined-stats
+// GetCombinedStats handles POST /node/stats/get-combined-stats
 func (h *Handler) GetCombinedStats(c *gin.Context) {
-	reset := c.Query("reset") == "true"
+	var req GetCombinedStatsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		return
+	}
 
-	resp, err := h.service.GetCombinedStats(reset)
+	resp, err := h.service.GetCombinedStats(req.Reset)
 	if err != nil {
 		errors.SendError(c, errors.ErrFailedToGetCombinedStats)
 		return
