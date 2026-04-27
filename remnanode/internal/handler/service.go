@@ -7,6 +7,7 @@ import (
 
 	"github.com/remnawave/remnanode/internal/state"
 	"github.com/remnawave/remnanode/internal/xray_client"
+	"github.com/remnawave/remnanode/pkg/connkill"
 )
 
 // Service handles user management operations
@@ -262,9 +263,10 @@ func (s *Service) GetInboundUsersCount(tag string) (*GetInboundUsersCountRespons
 	return &GetInboundUsersCountResponse{Count: count}, nil
 }
 
-// DropUsersConnections drops all active connections for the given user IDs.
-// Retrieves each user's IPs via xray and logs them; actual RST requires CAP_NET_ADMIN.
+// DropUsersConnections RSTs all TCP connections for the given user IDs.
+// It resolves each user's current IPs via xray gRPC, then calls SOCK_DESTROY via netlink.
 func (s *Service) DropUsersConnections(req *DropUsersConnectionsRequest) (*GenericResponse, error) {
+	var allIPs []string
 	for _, userID := range req.UserIDs {
 		ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>" + userID + ">>>online")
 		if err != nil {
@@ -272,16 +274,21 @@ func (s *Service) DropUsersConnections(req *DropUsersConnectionsRequest) (*Gener
 			continue
 		}
 		for _, ip := range ips {
-			log.Debug().Str("userId", userID).Str("ip", ip.IP).Msg("Drop connection for user IP")
+			allIPs = append(allIPs, ip.IP)
+		}
+	}
+	if len(allIPs) > 0 {
+		if err := connkill.DropByIPs(allIPs); err != nil {
+			log.Warn().Err(err).Strs("ips", allIPs).Msg("Failed to drop connections")
 		}
 	}
 	return &GenericResponse{Success: true}, nil
 }
 
-// DropIps drops all active connections from the given IPs.
+// DropIps RSTs all TCP connections from the given IP addresses via SOCK_DESTROY.
 func (s *Service) DropIps(req *DropIpsRequest) (*GenericResponse, error) {
-	for _, ip := range req.IPs {
-		log.Debug().Str("ip", ip).Msg("Drop connection for IP")
+	if err := connkill.DropByIPs(req.IPs); err != nil {
+		log.Warn().Err(err).Msg("Failed to drop connections by IP")
 	}
 	return &GenericResponse{Success: true}, nil
 }

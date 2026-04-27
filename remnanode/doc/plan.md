@@ -30,6 +30,7 @@ ssh -p 50413 root@103.179.44.9 "chmod +x /root/remnanode && rc-service node star
 ```
 
 To update rw-core (download locally, upload — server cannot reach GitHub directly):
+you can also update from: https://raw.githubusercontent.com/remnawave/scripts/main/scripts/install-latest-xray.sh 
 ```sh
 curl -fsSL -L https://github.com/XTLS/Xray-core/releases/download/vX.Y.Z/Xray-linux-64.zip -o /tmp/xray.zip
 cd /tmp && unzip -o xray.zip xray -d /tmp/xray-out
@@ -56,6 +57,4 @@ ssh -p 50413 root@103.179.44.9 "chmod +x /tmp/xray-new && mv /tmp/xray-new /usr/
 
 ## Known gaps vs TypeScript
 
-- `drop-users-connections` / `drop-ips`: endpoints exist and return `{success:true}` but do not actually RST connections — requires `CAP_NET_ADMIN` + OS-level socket destroy (equivalent of `sockdestroy` npm package). TypeScript degrades the same way when CAP_NET_ADMIN is unavailable.
 - Plugin system (torrent blocker, nftables, egress/ingress filters): not implemented. `plugins.torrentBlocker.reportsCount` is always 0.
-- Network interface stats in `system.stats.interface`: always `null` (field present, not populated).
