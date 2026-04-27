@@ -145,3 +145,31 @@ func (h *Handler) GetCombinedStats(c *gin.Context) {
 
 	errors.SendSuccess(c, resp)
 }
+
+// GetUserIpList handles POST /node/stats/get-user-ip-list
+func (h *Handler) GetUserIpList(c *gin.Context) {
+	var req GetUserIpListRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		return
+	}
+
+	resp, err := h.service.GetUserIpList(req.UserID)
+	if err != nil {
+		errors.SendError(c, errors.ErrInternalServer)
+		return
+	}
+
+	errors.SendSuccess(c, resp)
+}
+
+// GetUsersIpList handles GET /node/stats/get-users-ip-list
+func (h *Handler) GetUsersIpList(c *gin.Context) {
+	resp, err := h.service.GetUsersIpList()
+	if err != nil {
+		errors.SendError(c, errors.ErrInternalServer)
+		return
+	}
+
+	errors.SendSuccess(c, resp)
+}

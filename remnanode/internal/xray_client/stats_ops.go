@@ -276,6 +276,41 @@ func (c *Client) GetAllOutboundsStats(reset bool) ([]OutboundStats, error) {
 	return outbounds, nil
 }
 
+// OnlineUserIp represents an IP entry with last-seen timestamp
+type OnlineUserIp struct {
+	IP       string
+	LastSeen int64 // unix timestamp
+}
+
+// GetStatsOnlineIpList gets the list of IPs for a user (name = "user>>>userId>>>online")
+func (c *Client) GetStatsOnlineIpList(name string) ([]OnlineUserIp, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.stats.GetStatsOnlineIpList(ctx, &statsService.GetStatsRequest{Name: name, Reset_: true})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]OnlineUserIp, 0, len(resp.Ips))
+	for ip, ts := range resp.Ips {
+		result = append(result, OnlineUserIp{IP: ip, LastSeen: ts})
+	}
+	return result, nil
+}
+
+// GetAllOnlineUsers returns all online user stat names
+func (c *Client) GetAllOnlineUsers() ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.stats.GetAllOnlineUsers(ctx, &statsService.GetAllOnlineUsersRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Users, nil
+}
+
 // parseTrafficValue parses a traffic stat value string to int64
 func parseTrafficValue(value string) int64 {
 	v, _ := strconv.ParseInt(value, 10, 64)

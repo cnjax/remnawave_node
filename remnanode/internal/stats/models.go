@@ -1,9 +1,14 @@
 package stats
 
-import "github.com/remnawave/remnanode/internal/xray_client"
+import (
+	"time"
 
-// GetSystemStatsResponse represents the response for system stats
-type GetSystemStatsResponse struct {
+	"github.com/remnawave/remnanode/internal/xray_client"
+	"github.com/remnawave/remnanode/pkg/sysinfo"
+)
+
+// XrayInfo holds xray process statistics
+type XrayInfo struct {
 	NumGoroutine uint32 `json:"numGoroutine"`
 	NumGC        uint32 `json:"numGC"`
 	Alloc        uint64 `json:"alloc"`
@@ -14,6 +19,25 @@ type GetSystemStatsResponse struct {
 	LiveObjects  uint64 `json:"liveObjects"`
 	PauseTotalNs uint64 `json:"pauseTotalNs"`
 	Uptime       uint32 `json:"uptime"`
+}
+
+// PluginStats holds stats from plugins
+type PluginStats struct {
+	TorrentBlocker struct {
+		ReportsCount int `json:"reportsCount"`
+	} `json:"torrentBlocker"`
+}
+
+// SystemStatsWrapper wraps system stats
+type SystemStatsWrapper struct {
+	Stats *sysinfo.SystemStats `json:"stats"`
+}
+
+// GetSystemStatsResponse represents the response for system stats (new format)
+type GetSystemStatsResponse struct {
+	XrayInfo *XrayInfo          `json:"xrayInfo"`
+	Plugins  PluginStats        `json:"plugins"`
+	System   SystemStatsWrapper `json:"system"`
 }
 
 // GetUserOnlineStatusResponse represents the response for user online status
@@ -61,4 +85,26 @@ type GetAllOutboundsStatsResponse struct {
 type GetCombinedStatsResponse struct {
 	Inbounds  []xray_client.InboundStats  `json:"inbounds"`
 	Outbounds []xray_client.OutboundStats `json:"outbounds"`
+}
+
+// DetailedIP represents an IP with last-seen timestamp
+type DetailedIP struct {
+	IP       string    `json:"ip"`
+	LastSeen time.Time `json:"lastSeen"`
+}
+
+// GetUserIpListResponse represents the response for user IP list
+type GetUserIpListResponse struct {
+	IPs []DetailedIP `json:"ips"`
+}
+
+// UserIpList holds IPs for a single user
+type UserIpList struct {
+	UserID string       `json:"userId"`
+	IPs    []DetailedIP `json:"ips"`
+}
+
+// GetUsersIpListResponse represents the response for all users IP list
+type GetUsersIpListResponse struct {
+	Users []UserIpList `json:"users"`
 }

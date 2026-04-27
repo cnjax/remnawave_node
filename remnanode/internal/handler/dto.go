@@ -6,9 +6,11 @@ import "github.com/remnawave/remnanode/internal/xray_client"
 type UserType string
 
 const (
-	UserTypeVless       UserType = "vless"
-	UserTypeTrojan      UserType = "trojan"
-	UserTypeShadowsocks UserType = "shadowsocks"
+	UserTypeVless          UserType = "vless"
+	UserTypeTrojan         UserType = "trojan"
+	UserTypeShadowsocks    UserType = "shadowsocks"
+	UserTypeShadowsocks22  UserType = "shadowsocks22"
+	UserTypeHysteria       UserType = "hysteria"
 )
 
 // InboundUserData represents data for a single user in an inbound
@@ -88,4 +90,14 @@ type GetInboundUsersRequest struct {
 // GetInboundUsersCountRequest represents the request to get inbound users count
 type GetInboundUsersCountRequest struct {
 	Tag string `json:"tag" binding:"required"`
+}
+
+// DropUsersConnectionsRequest represents the request to drop connections for specific users
+type DropUsersConnectionsRequest struct {
+	UserIDs []string `json:"userIds" binding:"required,min=1"`
+}
+
+// DropIpsRequest represents the request to drop connections for specific IPs
+type DropIpsRequest struct {
+	IPs []string `json:"ips" binding:"required,min=1"`
 }

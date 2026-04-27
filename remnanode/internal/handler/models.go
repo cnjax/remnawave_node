@@ -28,3 +28,8 @@ type GetInboundUsersResponse struct {
 type GetInboundUsersCountResponse struct {
 	Count int `json:"count"`
 }
+
+// GenericResponse represents a generic success/failure response
+type GenericResponse struct {
+	Success bool `json:"success"`
+}

@@ -1,9 +1,13 @@
 package stats
 
 import (
+	"strings"
+	"time"
+
 	"github.com/rs/zerolog/log"
 
 	"github.com/remnawave/remnanode/internal/xray_client"
+	"github.com/remnawave/remnanode/pkg/sysinfo"
 )
 
 // Service handles statistics operations
@@ -16,25 +20,41 @@ func NewService(xrayClient *xray_client.Client) *Service {
 	return &Service{xrayClient: xrayClient}
 }
 
-// GetSystemStats retrieves system statistics from Xray
+// GetSystemStats retrieves system statistics
 func (s *Service) GetSystemStats() (*GetSystemStatsResponse, error) {
-	stats, err := s.xrayClient.GetSysStats()
+	rawStats, err := s.xrayClient.GetSysStats()
+
+	var xrayInfo *XrayInfo
 	if err != nil {
-		log.Warn().Err(err).Msg("Failed to get system stats")
-		return nil, err
+		log.Warn().Err(err).Msg("Failed to get xray sys stats")
+	} else {
+		xrayInfo = &XrayInfo{
+			NumGoroutine: rawStats.NumGoroutine,
+			NumGC:        rawStats.NumGC,
+			Alloc:        rawStats.Alloc,
+			TotalAlloc:   rawStats.TotalAlloc,
+			Sys:          rawStats.Sys,
+			Mallocs:      rawStats.Mallocs,
+			Frees:        rawStats.Frees,
+			LiveObjects:  rawStats.LiveObjects,
+			PauseTotalNs: rawStats.PauseTotalNs,
+			Uptime:       rawStats.Uptime,
+		}
 	}
 
+	sysStat, sysErr := sysinfo.GetSystemStats()
+	if sysErr != nil {
+		log.Warn().Err(sysErr).Msg("Failed to get system stats")
+		sysStat = &sysinfo.SystemStats{LoadAvg: []float64{0, 0, 0}}
+	}
+
+	var plugins PluginStats
+	plugins.TorrentBlocker.ReportsCount = 0
+
 	return &GetSystemStatsResponse{
-		NumGoroutine: stats.NumGoroutine,
-		NumGC:        stats.NumGC,
-		Alloc:        stats.Alloc,
-		TotalAlloc:   stats.TotalAlloc,
-		Sys:          stats.Sys,
-		Mallocs:      stats.Mallocs,
-		Frees:        stats.Frees,
-		LiveObjects:  stats.LiveObjects,
-		PauseTotalNs: stats.PauseTotalNs,
-		Uptime:       stats.Uptime,
+		XrayInfo: xrayInfo,
+		Plugins:  plugins,
+		System:   SystemStatsWrapper{Stats: sysStat},
 	}, nil
 }
 
@@ -57,7 +77,6 @@ func (s *Service) GetUsersStats(reset bool) (*GetUsersStatsResponse, error) {
 		return nil, err
 	}
 
-	// Filter out users with no traffic
 	filtered := make([]UserStats, 0)
 	for _, u := range stats {
 		if u.Uplink != 0 || u.Downlink != 0 {
@@ -137,4 +156,71 @@ func (s *Service) GetCombinedStats(reset bool) (*GetCombinedStatsResponse, error
 		Inbounds:  inbounds,
 		Outbounds: outbounds,
 	}, nil
+}
+
+// GetUserIpList retrieves the list of IPs for a specific user
+func (s *Service) GetUserIpList(userID string) (*GetUserIpListResponse, error) {
+	ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>" + userID + ">>>online")
+	if err != nil {
+		log.Warn().Err(err).Str("userId", userID).Msg("Failed to get user IP list")
+		return &GetUserIpListResponse{IPs: []DetailedIP{}}, nil
+	}
+
+	result := make([]DetailedIP, 0, len(ips))
+	for _, ip := range ips {
+		result = append(result, DetailedIP{
+			IP:       ip.IP,
+			LastSeen: time.Unix(ip.LastSeen, 0),
+		})
+	}
+
+	return &GetUserIpListResponse{IPs: result}, nil
+}
+
+// GetUsersIpList retrieves IP lists for all online users
+func (s *Service) GetUsersIpList() (*GetUsersIpListResponse, error) {
+	onlineUsers, err := s.xrayClient.GetAllOnlineUsers()
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to get all online users")
+		return &GetUsersIpListResponse{Users: []UserIpList{}}, nil
+	}
+
+	seen := make(map[string]struct{})
+	users := make([]UserIpList, 0)
+
+	for _, raw := range onlineUsers {
+		// raw format: "user>>>userId>>>online"
+		parts := strings.Split(raw, ">>>")
+		if len(parts) < 2 {
+			continue
+		}
+		userID := parts[1]
+		if _, ok := seen[userID]; ok {
+			continue
+		}
+		seen[userID] = struct{}{}
+
+		ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>" + userID + ">>>online")
+		if err != nil {
+			continue
+		}
+		if len(ips) == 0 {
+			continue
+		}
+
+		details := make([]DetailedIP, 0, len(ips))
+		for _, ip := range ips {
+			details = append(details, DetailedIP{
+				IP:       ip.IP,
+				LastSeen: time.Unix(ip.LastSeen, 0),
+			})
+		}
+
+		users = append(users, UserIpList{
+			UserID: userID,
+			IPs:    details,
+		})
+	}
+
+	return &GetUsersIpListResponse{Users: users}, nil
 }

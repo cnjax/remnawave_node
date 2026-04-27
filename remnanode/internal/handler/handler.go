@@ -117,3 +117,37 @@ func (h *Handler) GetInboundUsersCount(c *gin.Context) {
 
 	errors.SendSuccess(c, resp)
 }
+
+// DropUsersConnections handles POST /node/handler/drop-users-connections
+func (h *Handler) DropUsersConnections(c *gin.Context) {
+	var req DropUsersConnectionsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		return
+	}
+
+	resp, err := h.service.DropUsersConnections(&req)
+	if err != nil {
+		errors.SendError(c, errors.ErrInternalServer)
+		return
+	}
+
+	errors.SendSuccess(c, resp)
+}
+
+// DropIps handles POST /node/handler/drop-ips
+func (h *Handler) DropIps(c *gin.Context) {
+	var req DropIpsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		return
+	}
+
+	resp, err := h.service.DropIps(&req)
+	if err != nil {
+		errors.SendError(c, errors.ErrInternalServer)
+		return
+	}
+
+	errors.SendSuccess(c, resp)
+}

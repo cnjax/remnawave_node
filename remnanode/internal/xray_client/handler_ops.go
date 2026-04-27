@@ -8,7 +8,9 @@ import (
 	"github.com/xtls/xray-core/app/proxyman/command"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
+	hysteriaAccount "github.com/xtls/xray-core/proxy/hysteria/account"
 	"github.com/xtls/xray-core/proxy/shadowsocks"
+	shadowsocks2022 "github.com/xtls/xray-core/proxy/shadowsocks_2022"
 	"github.com/xtls/xray-core/proxy/trojan"
 	"github.com/xtls/xray-core/proxy/vless"
 )
@@ -158,4 +160,70 @@ func (c *Client) GetInboundUsersCount(tag string) (int, error) {
 		return 0, err
 	}
 	return len(users), nil
+}
+
+// AddShadowsocks2022User adds a Shadowsocks 2022 user to an inbound
+func (c *Client) AddShadowsocks2022User(tag, username, key string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	account := &shadowsocks2022.Account{
+		Key: key,
+	}
+
+	user := &protocol.User{
+		Level:   0,
+		Email:   username,
+		Account: serial.ToTypedMessage(account),
+	}
+
+	_, err := c.handler.AlterInbound(ctx, &command.AlterInboundRequest{
+		Tag: tag,
+		Operation: serial.ToTypedMessage(&command.AddUserOperation{
+			User: user,
+		}),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to add Shadowsocks2022 user: %w", err)
+	}
+	return nil
+}
+
+// AddHysteriaUser adds a Hysteria user to an inbound
+func (c *Client) AddHysteriaUser(tag, username, auth string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	account := &hysteriaAccount.Account{
+		Auth: auth,
+	}
+
+	user := &protocol.User{
+		Level:   0,
+		Email:   username,
+		Account: serial.ToTypedMessage(account),
+	}
+
+	_, err := c.handler.AlterInbound(ctx, &command.AlterInboundRequest{
+		Tag: tag,
+		Operation: serial.ToTypedMessage(&command.AddUserOperation{
+			User: user,
+		}),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to add Hysteria user: %w", err)
+	}
+	return nil
+}
+
+// RemoveOutbound removes an outbound from the Xray configuration
+func (c *Client) RemoveOutbound(tag string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := c.handler.RemoveOutbound(ctx, &command.RemoveOutboundRequest{Tag: tag})
+	if err != nil {
+		return fmt.Errorf("failed to remove outbound: %w", err)
+	}
+	return nil
 }

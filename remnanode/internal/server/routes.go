@@ -44,13 +44,14 @@ func (s *Server) setupRoutes() {
 func (s *Server) setupHandlerRoutes(group *gin.RouterGroup) {
 	h, ok := s.services.Handler.(*handler.Handler)
 	if !ok || h == nil {
-		// Placeholder routes if handler not initialized
 		group.POST("/add-user", notImplemented)
 		group.POST("/add-users", notImplemented)
 		group.POST("/remove-user", notImplemented)
 		group.POST("/remove-users", notImplemented)
 		group.POST("/get-inbound-users", notImplemented)
 		group.POST("/get-inbound-users-count", notImplemented)
+		group.POST("/drop-users-connections", notImplemented)
+		group.POST("/drop-ips", notImplemented)
 		return
 	}
 
@@ -60,6 +61,8 @@ func (s *Server) setupHandlerRoutes(group *gin.RouterGroup) {
 	group.POST("/remove-users", h.RemoveUsers)
 	group.POST("/get-inbound-users", h.GetInboundUsers)
 	group.POST("/get-inbound-users-count", h.GetInboundUsersCount)
+	group.POST("/drop-users-connections", h.DropUsersConnections)
+	group.POST("/drop-ips", h.DropIps)
 }
 
 // setupStatsRoutes configures stats module routes
@@ -74,6 +77,8 @@ func (s *Server) setupStatsRoutes(group *gin.RouterGroup) {
 		group.POST("/get-all-inbounds-stats", notImplemented)
 		group.POST("/get-all-outbounds-stats", notImplemented)
 		group.POST("/get-combined-stats", notImplemented)
+		group.POST("/get-user-ip-list", notImplemented)
+		group.GET("/get-users-ip-list", notImplemented)
 		return
 	}
 
@@ -85,6 +90,8 @@ func (s *Server) setupStatsRoutes(group *gin.RouterGroup) {
 	group.POST("/get-all-inbounds-stats", st.GetAllInboundsStats)
 	group.POST("/get-all-outbounds-stats", st.GetAllOutboundsStats)
 	group.POST("/get-combined-stats", st.GetCombinedStats)
+	group.POST("/get-user-ip-list", st.GetUserIpList)
+	group.GET("/get-users-ip-list", st.GetUsersIpList)
 }
 
 // setupXrayRoutes configures xray module routes

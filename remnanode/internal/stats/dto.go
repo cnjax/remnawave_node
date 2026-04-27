@@ -36,3 +36,8 @@ type GetAllOutboundsStatsRequest struct {
 type GetCombinedStatsRequest struct {
 	Reset bool `json:"reset"`
 }
+
+// GetUserIpListRequest represents the request to get IPs for a specific user
+type GetUserIpListRequest struct {
+	UserID string `json:"userId" binding:"required"`
+}

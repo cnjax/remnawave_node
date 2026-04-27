@@ -13,15 +13,9 @@ type Config struct {
 	XtlsPort              string
 	DisableHashedSetCheck bool
 	XrayCoreVersion       string
-
-	// Xray binary path
-	XrayBinaryPath string
-
-	// TLS configuration
-	TLS TLSConfig
-
-	// JWT configuration
-	JWTPublicKey string
+	XrayBinaryPath        string
+	TLS                   TLSConfig
+	JWTPublicKey          string
 }
 
 // TLSConfig holds TLS certificate configuration

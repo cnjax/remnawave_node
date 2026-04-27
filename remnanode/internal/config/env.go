@@ -26,9 +26,9 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("NODE_PORT must be a valid integer: %w", err)
 	}
 
-	// Parse optional variables with defaults
-	xtlsIP := getEnvOrDefault("XTLS_IP", "127.0.0.1")
-	xtlsPort := getEnvOrDefault("XTLS_PORT", XrayGRPCPort)
+	// XTLS_API_PORT is the canonical variable; fall back to XTLS_PORT for compatibility.
+	xtlsIP := "127.0.0.1"
+	xtlsPort := getEnvOrDefault("XTLS_API_PORT", getEnvOrDefault("XTLS_PORT", XrayGRPCPort))
 
 	// Parse DISABLE_HASHED_SET_CHECK
 	disableHashedSetCheck := false

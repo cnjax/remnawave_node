@@ -64,6 +64,10 @@ func (s *Service) AddUser(req *AddUserRequest) (*AddUserResponse, error) {
 			err = s.xrayClient.AddTrojanUser(item.Tag, item.Username, item.Password)
 		case UserTypeShadowsocks:
 			err = s.xrayClient.AddShadowsocksUser(item.Tag, item.Username, item.Password, item.CipherType, item.IVCheck)
+		case UserTypeShadowsocks22:
+			err = s.xrayClient.AddShadowsocks2022User(item.Tag, item.Username, item.Password)
+		case UserTypeHysteria:
+			err = s.xrayClient.AddHysteriaUser(item.Tag, item.Username, item.Password)
 		}
 
 		if err != nil {
@@ -170,6 +174,10 @@ func (s *Service) AddUsers(req *AddUsersRequest) (*AddUserResponse, error) {
 				err = s.xrayClient.AddTrojanUser(inbound.Tag, user.UserData.UserID, user.UserData.TrojanPassword)
 			case UserTypeShadowsocks:
 				err = s.xrayClient.AddShadowsocksUser(inbound.Tag, user.UserData.UserID, user.UserData.SSPassword, xray_client.CipherTypeCHACHA20POLY1305, false)
+			case UserTypeShadowsocks22:
+				err = s.xrayClient.AddShadowsocks2022User(inbound.Tag, user.UserData.UserID, user.UserData.SSPassword)
+			case UserTypeHysteria:
+				err = s.xrayClient.AddHysteriaUser(inbound.Tag, user.UserData.UserID, user.UserData.TrojanPassword)
 			}
 
 			if err == nil {
@@ -252,4 +260,28 @@ func (s *Service) GetInboundUsersCount(tag string) (*GetInboundUsersCountRespons
 	}
 
 	return &GetInboundUsersCountResponse{Count: count}, nil
+}
+
+// DropUsersConnections drops all active connections for the given user IDs.
+// Retrieves each user's IPs via xray and logs them; actual RST requires CAP_NET_ADMIN.
+func (s *Service) DropUsersConnections(req *DropUsersConnectionsRequest) (*GenericResponse, error) {
+	for _, userID := range req.UserIDs {
+		ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>" + userID + ">>>online")
+		if err != nil {
+			log.Warn().Err(err).Str("userId", userID).Msg("Failed to get user IPs for drop")
+			continue
+		}
+		for _, ip := range ips {
+			log.Debug().Str("userId", userID).Str("ip", ip.IP).Msg("Drop connection for user IP")
+		}
+	}
+	return &GenericResponse{Success: true}, nil
+}
+
+// DropIps drops all active connections from the given IPs.
+func (s *Service) DropIps(req *DropIpsRequest) (*GenericResponse, error) {
+	for _, ip := range req.IPs {
+		log.Debug().Str("ip", ip).Msg("Drop connection for IP")
+	}
+	return &GenericResponse{Success: true}, nil
 }

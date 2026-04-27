@@ -1,6 +1,7 @@
 package xray
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -12,6 +13,19 @@ import (
 	"github.com/remnawave/remnanode/internal/xray_client"
 	"github.com/remnawave/remnanode/pkg/sysinfo"
 )
+
+func formatBytes(bytes uint64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := uint64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.2f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
 
 const (
 	maxRetries    = 10
@@ -61,16 +75,16 @@ func NewService(
 
 // loadSystemStats loads system information
 func (s *Service) loadSystemStats() {
-	stats, err := sysinfo.GetSystemStats()
+	info, err := sysinfo.GetSystemInfo()
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get system stats")
+		log.Error().Err(err).Msg("Failed to get system info")
 		return
 	}
 
 	s.systemStats = &SystemInfo{
-		CPUCores:    stats.CPUCores,
-		CPUModel:    stats.CPUModel,
-		MemoryTotal: stats.MemoryTotal,
+		CPUCores:    info.CPUs,
+		CPUModel:    info.CPUModel,
+		MemoryTotal: formatBytes(info.MemoryTotal),
 	}
 }
 
