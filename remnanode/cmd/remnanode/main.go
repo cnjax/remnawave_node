@@ -54,7 +54,7 @@ func main() {
 	}
 
 	// Create process manager for Xray (replaces supervisord)
-	configURL := fmt.Sprintf("http://127.0.0.1:%d/internal/get-config", config.XrayInternalAPIPort)
+	configURL := fmt.Sprintf("http://127.0.0.1:%d/internal/get-config?token=%s", config.XrayInternalAPIPort, cfg.InternalRestToken)
 	processManager := process.NewManager(cfg.XrayBinaryPath, configURL)
 
 	// Check if Xray binary exists

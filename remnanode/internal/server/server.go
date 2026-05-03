@@ -50,7 +50,7 @@ func New(cfg *config.Config, services *Services) (*Server, error) {
 	mainRouter.Use(middleware.BodyLimit(bodyLimitBytes))
 	mainRouter.Use(middleware.GzipDecompress()) // Decompress gzip request bodies
 	mainRouter.Use(middleware.GzipCompress())   // Compress gzip response bodies (matching TS compression())
-	mainRouter.Use(middleware.APIDiagnostics())
+	mainRouter.Use(middleware.APIDiagnostics(cfg.Debug))
 	if config.IsDevelopment() {
 		mainRouter.Use(middleware.Logger())
 	}
@@ -65,7 +65,7 @@ func New(cfg *config.Config, services *Services) (*Server, error) {
 	internalRouter.Use(middleware.BodyLimit(bodyLimitBytes))
 	internalRouter.Use(middleware.InternalOnly())
 	internalRouter.Use(middleware.TokenAuth(cfg.InternalRestToken))
-	internalRouter.Use(middleware.APIDiagnostics())
+	internalRouter.Use(middleware.APIDiagnostics(cfg.Debug))
 	// Internal router also ignores proxy headers — it only accepts localhost connections.
 	if err := internalRouter.SetTrustedProxies(nil); err != nil {
 		return nil, fmt.Errorf("failed to set trusted proxies on internal router: %w", err)

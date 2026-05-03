@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"compress/gzip"
 	"io"
 	"net/http"
 	"regexp"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -16,9 +18,15 @@ const diagnosticBodyLimit = 8192
 
 var sensitiveJSONFieldPattern = regexp.MustCompile(`(?i)("(?:secret|secretKey|token|authorization|password|uuid|vlessUuid|prevVlessUuid|trojanPassword|ssPassword|id|key)"\s*:\s*")([^"]*)(")`)
 
-// APIDiagnostics logs request/response details only for failed API calls.
-// It captures bounded body prefixes while handlers read/write normally.
-func APIDiagnostics() gin.HandlerFunc {
+// APIDiagnostics logs request/response details.
+//
+// debug=false: logs only failed API calls (status >= 400 or error bodies).
+// debug=true:  logs every request/response pair at Info level.
+//
+// Request bodies are captured after GzipDecompress has already run, so they
+// are normally plain JSON at this point. As a safety net, any body that still
+// starts with the gzip magic bytes (0x1f 0x8b) is decompressed before logging.
+func APIDiagnostics(debug bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 
@@ -41,11 +49,22 @@ func APIDiagnostics() gin.HandlerFunc {
 
 		status := c.Writer.Status()
 		responseBody := respCapture.String()
-		if !shouldLogAPIDiagnostic(status, responseBody) {
+
+		if !debug && !shouldLogAPIDiagnostic(status, responseBody) {
 			return
 		}
 
-		log.Warn().
+		// Decompress request body if it slipped through as raw gzip.
+		reqBody := decompressIfGzip(reqCapture.String())
+
+		var ev *zerolog.Event
+		if status >= http.StatusBadRequest {
+			ev = log.Warn()
+		} else {
+			ev = log.Info()
+		}
+
+		ev.
 			Str("method", c.Request.Method).
 			Str("path", c.Request.URL.Path).
 			Str("query", c.Request.URL.RawQuery).
@@ -53,12 +72,30 @@ func APIDiagnostics() gin.HandlerFunc {
 			Dur("latency", time.Since(start)).
 			Str("ip", c.ClientIP()).
 			Str("user_agent", c.Request.UserAgent()).
-			Str("request_body", sanitizeDiagnosticBody(reqCapture.String())).
+			Str("request_body", sanitizeDiagnosticBody(reqBody)).
 			Bool("request_body_truncated", reqCapture.Truncated()).
 			Str("response_body", sanitizeDiagnosticBody(responseBody)).
 			Bool("response_body_truncated", respCapture.Truncated()).
-			Msg("api request failed")
+			Msg("api request")
 	}
+}
+
+// decompressIfGzip returns the gzip-decompressed string if data starts with the
+// gzip magic bytes, otherwise returns the original string unchanged.
+func decompressIfGzip(s string) string {
+	if len(s) < 2 || s[0] != '\x1f' || s[1] != '\x8b' {
+		return s
+	}
+	r, err := gzip.NewReader(strings.NewReader(s))
+	if err != nil {
+		return s
+	}
+	defer r.Close()
+	decompressed, err := io.ReadAll(io.LimitReader(r, diagnosticBodyLimit))
+	if err != nil {
+		return s
+	}
+	return string(decompressed)
 }
 
 type limitedBuffer struct {

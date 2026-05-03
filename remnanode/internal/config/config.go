@@ -15,6 +15,7 @@ type Config struct {
 	XrayCoreVersion       string
 	XrayBinaryPath        string
 	InternalRestToken     string
+	Debug                 bool
 	TLS                   TLSConfig
 	JWTPublicKey          string
 }

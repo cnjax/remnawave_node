@@ -51,6 +51,10 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("INTERNAL_REST_TOKEN environment variable is required")
 	}
 
+	// DEBUG enables full request/response logging
+	debugEnv := strings.ToLower(os.Getenv("DEBUG"))
+	debug := debugEnv == "true" || debugEnv == "1"
+
 	return &Config{
 		NodePort:              nodePort,
 		XtlsIP:                xtlsIP,
@@ -59,6 +63,7 @@ func LoadConfig() (*Config, error) {
 		XrayCoreVersion:       xrayCoreVersion,
 		XrayBinaryPath:        xrayBinaryPath,
 		InternalRestToken:     internalRestToken,
+		Debug:                 debug,
 		TLS: TLSConfig{
 			CACertPem:   payload.CACertPem,
 			NodeCertPem: payload.NodeCertPem,
