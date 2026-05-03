@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -18,6 +19,7 @@ type Manager struct {
 
 	cmd        *exec.Cmd
 	cancelFunc context.CancelFunc
+	done       chan struct{} // closed by the monitor goroutine when cmd.Wait() returns
 
 	binaryPath string
 	configURL  string
@@ -57,6 +59,7 @@ func (m *Manager) Start() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancelFunc = cancel
+	m.done = make(chan struct{})
 
 	// Create command: /usr/local/bin/rw-core -config http://127.0.0.1:61001/internal/get-config -format json
 	m.cmd = exec.CommandContext(ctx, m.binaryPath, "-config", m.configURL, "-format", "json")
@@ -87,7 +90,6 @@ func (m *Manager) Start() error {
 	m.isRunning = true
 	log.Info().
 		Str("binary", m.binaryPath).
-		Str("config", m.configURL).
 		Int("pid", m.cmd.Process.Pid).
 		Msg("Xray process started successfully")
 
@@ -107,9 +109,12 @@ func (m *Manager) Start() error {
 		}
 	}()
 
-	// Monitor process exit in goroutine
+	// Monitor process exit — the only place that writes isRunning=false.
+	done := m.done
 	go func() {
+		defer close(done)
 		err := m.cmd.Wait()
+
 		m.mu.Lock()
 		m.isRunning = false
 		m.mu.Unlock()
@@ -124,38 +129,51 @@ func (m *Manager) Start() error {
 	return nil
 }
 
-// Stop stops the Xray process
+// Stop stops the Xray process and waits until it has actually exited (up to 10 s).
 func (m *Manager) Stop() error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	return m.stopLocked()
 }
 
-// stopLocked stops the process (must be called with lock held)
+// stopLocked stops the process.
+// It releases the mutex while waiting for the process to exit, then re-acquires it.
+// Callers must hold m.mu before calling this.
 func (m *Manager) stopLocked() error {
 	if !m.isRunning || m.cmd == nil || m.cmd.Process == nil {
+		m.mu.Unlock()
 		return nil
 	}
 
 	log.Info().Int("pid", m.cmd.Process.Pid).Msg("Stopping Xray process")
 
-	// Cancel the context
 	if m.cancelFunc != nil {
 		m.cancelFunc()
 	}
 
-	// Send SIGTERM first for graceful shutdown
+	// Graceful SIGTERM first.
 	if err := m.cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		// If SIGTERM fails, try SIGKILL
-		if err := m.cmd.Process.Kill(); err != nil {
-			return fmt.Errorf("failed to kill xray process: %w", err)
-		}
+		m.cmd.Process.Kill() //nolint:errcheck
 	}
 
-	m.isRunning = false
-	log.Info().Msg("Xray process stopped")
+	// Capture the done channel before releasing the lock so we can wait on it.
+	done := m.done
+	m.mu.Unlock()
 
+	// Wait for the monitor goroutine to confirm exit, with a hard-kill fallback.
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		m.mu.Lock()
+		if m.cmd != nil && m.cmd.Process != nil {
+			m.cmd.Process.Kill() //nolint:errcheck
+		}
+		m.mu.Unlock()
+		// Wait for the goroutine to finish after the kill.
+		<-done
+	}
+
+	m.mu.Lock()
+	log.Info().Msg("Xray process stopped")
 	return nil
 }
 

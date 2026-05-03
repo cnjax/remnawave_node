@@ -13,6 +13,8 @@ import (
 	"github.com/remnawave/remnanode/internal/server/middleware"
 )
 
+const bodyLimitBytes = 1 << 30 // 1 GiB, matching TS bodyParser.json({ limit: '1000mb' })
+
 // Server represents the dual HTTP server setup
 type Server struct {
 	mainServer     *http.Server
@@ -43,13 +45,26 @@ func New(cfg *config.Config, services *Services) (*Server, error) {
 	// Create main router (HTTPS with mTLS)
 	mainRouter := gin.New()
 	mainRouter.Use(middleware.Recovery())
+	mainRouter.Use(middleware.SecureHeaders())
+	mainRouter.Use(middleware.BodyLimit(bodyLimitBytes))
 	mainRouter.Use(middleware.GzipDecompress()) // Decompress gzip request bodies
-	mainRouter.Use(middleware.Logger())
+	if config.IsDevelopment() {
+		mainRouter.Use(middleware.Logger())
+	}
+	// Do not trust X-Forwarded-For to prevent IP spoofing in ClientIP().
+	if err := mainRouter.SetTrustedProxies(nil); err != nil {
+		return nil, fmt.Errorf("failed to set trusted proxies: %w", err)
+	}
 
 	// Create internal router (HTTP on localhost)
 	internalRouter := gin.New()
 	internalRouter.Use(middleware.Recovery())
+	internalRouter.Use(middleware.BodyLimit(bodyLimitBytes))
 	internalRouter.Use(middleware.InternalOnly())
+	// Internal router also ignores proxy headers — it only accepts localhost connections.
+	if err := internalRouter.SetTrustedProxies(nil); err != nil {
+		return nil, fmt.Errorf("failed to set trusted proxies on internal router: %w", err)
+	}
 
 	server := &Server{
 		mainRouter:     mainRouter,
@@ -72,13 +87,13 @@ func (s *Server) Start() error {
 		return fmt.Errorf("failed to create TLS config: %w", err)
 	}
 
-	// Create main HTTPS server
+	// Create main HTTPS server (WriteTimeout=0 to avoid truncating long stats responses)
 	s.mainServer = &http.Server{
 		Addr:              fmt.Sprintf(":%d", s.config.NodePort),
 		Handler:           s.mainRouter,
 		TLSConfig:         tlsConfig,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      0,
 		IdleTimeout:       60 * time.Second,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
@@ -88,7 +103,7 @@ func (s *Server) Start() error {
 		Addr:              fmt.Sprintf("127.0.0.1:%d", config.XrayInternalAPIPort),
 		Handler:           s.internalRouter,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      0,
 		IdleTimeout:       60 * time.Second,
 		ReadHeaderTimeout: 10 * time.Second,
 	}

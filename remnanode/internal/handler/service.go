@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -12,20 +13,59 @@ import (
 
 // Service handles user management operations
 type Service struct {
-	xrayClient   *xray_client.Client
-	stateManager *state.Manager
+	xrayClient           *xray_client.Client
+	stateManager         *state.Manager
+	disableHashedSetCheck bool
 }
 
 // NewService creates a new handler service
-func NewService(xrayClient *xray_client.Client, stateManager *state.Manager) *Service {
+func NewService(xrayClient *xray_client.Client, stateManager *state.Manager, disableHashedSetCheck bool) *Service {
 	return &Service{
-		xrayClient:   xrayClient,
-		stateManager: stateManager,
+		xrayClient:           xrayClient,
+		stateManager:         stateManager,
+		disableHashedSetCheck: disableHashedSetCheck,
 	}
+}
+
+// strPtr is a convenience helper that returns a pointer to s.
+func strPtr(s string) *string { return &s }
+
+// validateInboundUser checks that type-specific required fields are present.
+func validateInboundUser(item InboundUserData) error {
+	switch item.Type {
+	case UserTypeVless:
+		if item.UUID == "" {
+			return fmt.Errorf("vless user %q: uuid is required", item.Username)
+		}
+	case UserTypeTrojan:
+		if item.Password == "" {
+			return fmt.Errorf("trojan user %q: password is required", item.Username)
+		}
+	case UserTypeShadowsocks:
+		if item.Password == "" || item.CipherType == xray_client.CipherTypeUnknown {
+			return fmt.Errorf("shadowsocks user %q: password and cipherType are required", item.Username)
+		}
+	case UserTypeShadowsocks22:
+		if item.Password == "" {
+			return fmt.Errorf("shadowsocks22 user %q: password is required", item.Username)
+		}
+	case UserTypeHysteria:
+		if item.Password == "" {
+			return fmt.Errorf("hysteria user %q: password is required", item.Username)
+		}
+	}
+	return nil
 }
 
 // AddUser adds a single user to the configured inbounds
 func (s *Service) AddUser(req *AddUserRequest) (*AddUserResponse, error) {
+	// Per-type validation
+	for _, item := range req.Data {
+		if err := validateInboundUser(item); err != nil {
+			return &AddUserResponse{Success: false, Error: strPtr(err.Error())}, nil
+		}
+	}
+
 	// Add tags to the state manager
 	for _, item := range req.Data {
 		s.stateManager.AddXtlsConfigInbound(item.Tag)
@@ -40,10 +80,12 @@ func (s *Service) AddUser(req *AddUserRequest) (*AddUserResponse, error) {
 
 		s.xrayClient.RemoveUser(tag, req.Data[0].Username)
 
-		if req.HashData.PrevVlessUUID != "" {
-			s.stateManager.RemoveUserFromInbound(tag, req.HashData.PrevVlessUUID)
-		} else {
-			s.stateManager.RemoveUserFromInbound(tag, req.HashData.VlessUUID)
+		if !s.disableHashedSetCheck {
+			if req.HashData.PrevVlessUUID != "" {
+				s.stateManager.RemoveUserFromInbound(tag, req.HashData.PrevVlessUUID)
+			} else {
+				s.stateManager.RemoveUserFromInbound(tag, req.HashData.VlessUUID)
+			}
 		}
 	}
 
@@ -76,23 +118,18 @@ func (s *Service) AddUser(req *AddUserRequest) (*AddUserResponse, error) {
 			log.Error().Err(err).Str("tag", item.Tag).Msg("Failed to add user")
 		} else {
 			successCount++
-			s.stateManager.AddUserToInbound(item.Tag, req.HashData.VlessUUID)
+			if !s.disableHashedSetCheck {
+				s.stateManager.AddUserToInbound(item.Tag, req.HashData.VlessUUID)
+			}
 		}
 	}
 
-	// If all additions failed, return error
 	if successCount == 0 && lastError != nil {
 		log.Error().Err(lastError).Msg("Error adding users")
-		return &AddUserResponse{
-			Success: false,
-			Error:   lastError.Error(),
-		}, nil
+		return &AddUserResponse{Success: false, Error: strPtr(lastError.Error())}, nil
 	}
 
-	return &AddUserResponse{
-		Success: true,
-		Error:   "",
-	}, nil
+	return &AddUserResponse{Success: true, Error: nil}, nil
 }
 
 // RemoveUser removes a single user from all inbounds
@@ -100,10 +137,7 @@ func (s *Service) RemoveUser(req *RemoveUserRequest) (*RemoveUserResponse, error
 	inboundTags := s.stateManager.GetXtlsConfigInbounds()
 
 	if len(inboundTags) == 0 {
-		return &RemoveUserResponse{
-			Success: true,
-			Error:   "",
-		}, nil
+		return &RemoveUserResponse{Success: true, Error: nil}, nil
 	}
 
 	var lastError error
@@ -116,7 +150,9 @@ func (s *Service) RemoveUser(req *RemoveUserRequest) (*RemoveUserResponse, error
 			Msg("Removing user")
 
 		err := s.xrayClient.RemoveUser(tag, req.Username)
-		s.stateManager.RemoveUserFromInbound(tag, req.HashData.VlessUUID)
+		if !s.disableHashedSetCheck {
+			s.stateManager.RemoveUserFromInbound(tag, req.HashData.VlessUUID)
+		}
 
 		if err != nil {
 			lastError = err
@@ -127,16 +163,10 @@ func (s *Service) RemoveUser(req *RemoveUserRequest) (*RemoveUserResponse, error
 
 	if successCount == 0 && lastError != nil {
 		log.Error().Err(lastError).Msg("Error removing user")
-		return &RemoveUserResponse{
-			Success: false,
-			Error:   lastError.Error(),
-		}, nil
+		return &RemoveUserResponse{Success: false, Error: strPtr(lastError.Error())}, nil
 	}
 
-	return &RemoveUserResponse{
-		Success: true,
-		Error:   "",
-	}, nil
+	return &RemoveUserResponse{Success: true, Error: nil}, nil
 }
 
 // AddUsers adds multiple users in bulk
@@ -162,7 +192,9 @@ func (s *Service) AddUsers(req *AddUsersRequest) (*AddUserResponse, error) {
 		// Remove user from all inbounds first
 		for _, tag := range s.stateManager.GetXtlsConfigInbounds() {
 			s.xrayClient.RemoveUser(tag, user.UserData.UserID)
-			s.stateManager.RemoveUserFromInbound(tag, user.UserData.HashUUID)
+			if !s.disableHashedSetCheck {
+				s.stateManager.RemoveUserFromInbound(tag, user.UserData.HashUUID)
+			}
 		}
 
 		// Add user to each inbound
@@ -181,16 +213,13 @@ func (s *Service) AddUsers(req *AddUsersRequest) (*AddUserResponse, error) {
 				err = s.xrayClient.AddHysteriaUser(inbound.Tag, user.UserData.UserID, user.UserData.TrojanPassword)
 			}
 
-			if err == nil {
+			if err == nil && !s.disableHashedSetCheck {
 				s.stateManager.AddUserToInbound(inbound.Tag, user.UserData.VlessUUID)
 			}
 		}
 	}
 
-	return &AddUserResponse{
-		Success: true,
-		Error:   "",
-	}, nil
+	return &AddUserResponse{Success: true, Error: nil}, nil
 }
 
 // RemoveUsers removes multiple users in bulk
@@ -205,10 +234,7 @@ func (s *Service) RemoveUsers(req *RemoveUsersRequest) (*RemoveUserResponse, err
 	inboundTags := s.stateManager.GetXtlsConfigInbounds()
 
 	if len(inboundTags) == 0 {
-		return &RemoveUserResponse{
-			Success: true,
-			Error:   "",
-		}, nil
+		return &RemoveUserResponse{Success: true, Error: nil}, nil
 	}
 
 	log.Info().
@@ -224,14 +250,13 @@ func (s *Service) RemoveUsers(req *RemoveUsersRequest) (*RemoveUserResponse, err
 				Msg("Removing user")
 
 			s.xrayClient.RemoveUser(tag, user.UserID)
-			s.stateManager.RemoveUserFromInbound(tag, user.HashUUID)
+			if !s.disableHashedSetCheck {
+				s.stateManager.RemoveUserFromInbound(tag, user.HashUUID)
+			}
 		}
 	}
 
-	return &RemoveUserResponse{
-		Success: true,
-		Error:   "",
-	}, nil
+	return &RemoveUserResponse{Success: true, Error: nil}, nil
 }
 
 // GetInboundUsers gets all users in an inbound
@@ -264,11 +289,10 @@ func (s *Service) GetInboundUsersCount(tag string) (*GetInboundUsersCountRespons
 }
 
 // DropUsersConnections RSTs all TCP connections for the given user IDs.
-// It resolves each user's current IPs via xray gRPC, then calls SOCK_DESTROY via netlink.
 func (s *Service) DropUsersConnections(req *DropUsersConnectionsRequest) (*GenericResponse, error) {
 	var allIPs []string
 	for _, userID := range req.UserIDs {
-		ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>" + userID + ">>>online")
+		ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>"+userID+">>>online", false)
 		if err != nil {
 			log.Warn().Err(err).Str("userId", userID).Msg("Failed to get user IPs for drop")
 			continue

@@ -63,10 +63,10 @@ func (s *Service) GetUserOnlineStatus(username string) (*GetUserOnlineStatusResp
 	online, err := s.xrayClient.GetUserOnlineStatus(username)
 	if err != nil {
 		log.Error().Err(err).Str("username", username).Msg("Failed to get user online status")
-		return &GetUserOnlineStatusResponse{Online: false}, nil
+		return &GetUserOnlineStatusResponse{IsOnline: false}, nil
 	}
 
-	return &GetUserOnlineStatusResponse{Online: online}, nil
+	return &GetUserOnlineStatusResponse{IsOnline: online}, nil
 }
 
 // GetUsersStats retrieves stats for all users
@@ -160,7 +160,7 @@ func (s *Service) GetCombinedStats(reset bool) (*GetCombinedStatsResponse, error
 
 // GetUserIpList retrieves the list of IPs for a specific user
 func (s *Service) GetUserIpList(userID string) (*GetUserIpListResponse, error) {
-	ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>" + userID + ">>>online")
+	ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>"+userID+">>>online", false)
 	if err != nil {
 		log.Warn().Err(err).Str("userId", userID).Msg("Failed to get user IP list")
 		return &GetUserIpListResponse{IPs: []DetailedIP{}}, nil
@@ -200,7 +200,7 @@ func (s *Service) GetUsersIpList() (*GetUsersIpListResponse, error) {
 		}
 		seen[userID] = struct{}{}
 
-		ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>" + userID + ">>>online")
+		ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>"+userID+">>>online", false)
 		if err != nil {
 			continue
 		}

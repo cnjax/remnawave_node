@@ -4,90 +4,100 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
+	"net"
 	"time"
 
+	routerpb "github.com/xtls/xray-core/app/router"
 	routerService "github.com/xtls/xray-core/app/router/command"
+	"github.com/xtls/xray-core/common/serial"
 )
 
-// BlockIP adds a rule to block an IP address
-func (c *Client) BlockIP(ip, username string) error {
+// BlockIP adds a source-IP routing rule that sends traffic from ip to the BLOCK outbound.
+// The rule tag is computed with generateRuleTag so it matches the TS objectHash output.
+func (c *Client) BlockIP(ip, _ string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Generate a unique rule tag from the IP using MD5 hash
 	ruleTag := generateRuleTag(ip)
-
-	// Use BalancerMsg to add an override for blocking
-	// Note: The actual implementation depends on xray-core version and available APIs
-	// For now, we'll use a simplified approach
-	_, err := c.router.AddRule(ctx, &routerService.AddRuleRequest{
-		Config:       nil, // Will be set based on xray-core API
-		ShouldAppend: true,
-	})
-
-	if err != nil {
-		// Log the attempt but don't fail - blocking may not be supported
-		return fmt.Errorf("failed to add block rule for IP %s (tag: %s): %w", ip, ruleTag, err)
-	}
-
-	return nil
+	return c.AddSrcIPRule(ctx, ruleTag, "BLOCK", ip)
 }
 
-// UnblockIP removes the block rule for an IP address
-func (c *Client) UnblockIP(ip, username string) error {
+// UnblockIP removes the block rule for ip (identified by its rule tag).
+func (c *Client) UnblockIP(ip, _ string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Generate the same rule tag that was used when blocking
 	ruleTag := generateRuleTag(ip)
-
-	// Remove the routing rule
-	_, err := c.router.RemoveRule(ctx, &routerService.RemoveRuleRequest{
-		RuleTag: ruleTag,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to remove block rule for IP %s: %w", ip, err)
-	}
-
-	return nil
+	return c.RemoveRuleByTagCtx(ctx, ruleTag)
 }
 
-// generateRuleTag generates a unique rule tag from an IP address using MD5
+// generateRuleTag produces the same hash as the TS objectHash(ip, {algorithm:'md5'}).
+// object-hash serialises a plain string as "string:<byteLength>:<value>" before hashing.
 func generateRuleTag(ip string) string {
-	hash := md5.Sum([]byte(ip))
-	return fmt.Sprintf("%x", hash)
+	input := fmt.Sprintf("string:%d:%s", len(ip), ip)
+	h := md5.Sum([]byte(input))
+	return fmt.Sprintf("%x", h)
 }
 
-// AddSrcIPRule adds a source IP routing rule
-func (c *Client) AddSrcIPRule(ruleTag, outboundTag, ip string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	_, err := c.router.AddRule(ctx, &routerService.AddRuleRequest{
-		Config:       nil, // Will be set based on xray-core API
-		ShouldAppend: true,
-	})
-
+// AddSrcIPRule constructs a real xray RoutingRule that matches the source IP and routes
+// traffic to outboundTag, then submits it via the router gRPC service.
+func (c *Client) AddSrcIPRule(ctx context.Context, ruleTag, outboundTag, ip string) error {
+	ipBytes, prefix, err := parseIPCIDR(ip)
 	if err != nil {
-		return fmt.Errorf("failed to add source IP rule: %w", err)
+		return fmt.Errorf("invalid IP %q: %w", ip, err)
 	}
 
+	rule := &routerpb.RoutingRule{
+		RuleTag: ruleTag,
+		TargetTag: &routerpb.RoutingRule_Tag{
+			Tag: outboundTag,
+		},
+		SourceGeoip: []*routerpb.GeoIP{
+			{
+				Cidr: []*routerpb.CIDR{
+					{Ip: ipBytes, Prefix: prefix},
+				},
+			},
+		},
+	}
+
+	_, err = c.router.AddRule(ctx, &routerService.AddRuleRequest{
+		Config:       serial.ToTypedMessage(rule),
+		ShouldAppend: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to add src-ip rule (tag=%s ip=%s): %w", ruleTag, ip, err)
+	}
 	return nil
 }
 
-// RemoveRuleByTag removes a routing rule by its tag
+// RemoveRuleByTag removes a routing rule by its tag (creates its own context).
 func (c *Client) RemoveRuleByTag(ruleTag string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	return c.RemoveRuleByTagCtx(ctx, ruleTag)
+}
 
+// RemoveRuleByTagCtx removes a routing rule using a caller-supplied context.
+func (c *Client) RemoveRuleByTagCtx(ctx context.Context, ruleTag string) error {
 	_, err := c.router.RemoveRule(ctx, &routerService.RemoveRuleRequest{
 		RuleTag: ruleTag,
 	})
-
 	if err != nil {
-		return fmt.Errorf("failed to remove rule by tag: %w", err)
+		return fmt.Errorf("failed to remove rule (tag=%s): %w", ruleTag, err)
 	}
-
 	return nil
+}
+
+// parseIPCIDR returns the raw bytes and prefix length for a host address.
+// IPv4 → 4 bytes, /32; IPv6 → 16 bytes, /128.
+func parseIPCIDR(ip string) ([]byte, uint32, error) {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return nil, 0, fmt.Errorf("cannot parse %q as IP", ip)
+	}
+	if v4 := parsed.To4(); v4 != nil {
+		return []byte(v4), 32, nil
+	}
+	return []byte(parsed.To16()), 128, nil
 }

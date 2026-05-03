@@ -1,35 +1,39 @@
 package middleware
 
 import (
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-// PortGuard middleware ensures requests come from the internal port
-// This is used for internal APIs that should only be accessible locally
-func PortGuard() gin.HandlerFunc {
+// InternalOnly rejects requests whose TCP remote address is not localhost.
+// Uses c.Request.RemoteAddr (not spoofable via headers) to obtain the real peer IP.
+func InternalOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// The internal server is bound to 127.0.0.1 only
-		// So any request reaching this middleware is already on the internal interface
-		// This guard is mainly for documentation purposes and extra safety
+		host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+		if err != nil {
+			sendForbidden(c)
+			return
+		}
+
+		ip := net.ParseIP(host)
+		if ip == nil || (!ip.Equal(net.IPv4(127, 0, 0, 1)) && !ip.Equal(net.IPv6loopback)) {
+			sendForbidden(c)
+			return
+		}
+
 		c.Next()
 	}
 }
 
-// InternalOnly middleware rejects requests from external sources
-func InternalOnly() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Check if request is from localhost
-		remoteAddr := c.ClientIP()
-		if remoteAddr != "127.0.0.1" && remoteAddr != "::1" && remoteAddr != "localhost" {
-			c.JSON(http.StatusForbidden, gin.H{
-				"isOk":    false,
-				"message": "Access denied: internal API only",
-			})
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
+func sendForbidden(c *gin.Context) {
+	c.JSON(http.StatusForbidden, gin.H{
+		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
+		"path":      c.Request.URL.Path,
+		"message":   "Access denied: internal API only",
+		"errorCode": "A004",
+	})
+	c.Abort()
 }

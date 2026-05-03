@@ -37,7 +37,7 @@ func (h *Handler) GetUserOnlineStatus(c *gin.Context) {
 
 	resp, err := h.service.GetUserOnlineStatus(req.Username)
 	if err != nil {
-		errors.SendSuccess(c, &GetUserOnlineStatusResponse{Online: false})
+		errors.SendSuccess(c, &GetUserOnlineStatusResponse{IsOnline: false})
 		return
 	}
 

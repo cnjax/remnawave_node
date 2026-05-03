@@ -37,10 +37,9 @@ func JWTMiddleware(publicKeyPEM string) gin.HandlerFunc {
 
 		tokenString := parts[1]
 
-		// Parse and validate token
+		// Parse and validate token — require exactly RS256, reject RS384/RS512/PS*.
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// Ensure the signing method is RS256
-			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			if token.Method.Alg() != jwt.SigningMethodRS256.Alg() {
 				return nil, jwt.ErrSignatureInvalid
 			}
 			return publicKey, nil

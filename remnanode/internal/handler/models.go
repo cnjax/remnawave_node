@@ -2,14 +2,14 @@ package handler
 
 // AddUserResponse represents the response for adding a user
 type AddUserResponse struct {
-	Success bool   `json:"success"`
-	Error   string `json:"error"`
+	Success bool    `json:"success"`
+	Error   *string `json:"error"`
 }
 
 // RemoveUserResponse represents the response for removing a user
 type RemoveUserResponse struct {
-	Success bool   `json:"success"`
-	Error   string `json:"error"`
+	Success bool    `json:"success"`
+	Error   *string `json:"error"`
 }
 
 // InboundUser represents a user in an inbound

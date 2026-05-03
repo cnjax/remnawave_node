@@ -40,9 +40,10 @@ type GetSystemStatsResponse struct {
 	System   SystemStatsWrapper `json:"system"`
 }
 
-// GetUserOnlineStatusResponse represents the response for user online status
+// GetUserOnlineStatusResponse represents the response for user online status.
+// Field name matches the TS contract (libs/contract/commands/stats/get-user-online-status.command.ts).
 type GetUserOnlineStatusResponse struct {
-	Online bool `json:"online"`
+	IsOnline bool `json:"isOnline"`
 }
 
 // UserStats represents a single user's stats

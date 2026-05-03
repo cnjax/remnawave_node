@@ -32,10 +32,11 @@ type GetXrayStatusResponse struct {
 	Version   string `json:"version"`
 }
 
-// GetNodeHealthCheckResponse represents the node health check response
+// GetNodeHealthCheckResponse represents the node health check response.
+// Field names match the TS contract (libs/contract/commands/xray/get-node-health-check.command.ts).
 type GetNodeHealthCheckResponse struct {
-	IsHealthy    bool   `json:"isHealthy"`
-	IsXrayOnline bool   `json:"isXrayOnline"`
-	XrayVersion  string `json:"xrayVersion"`
-	NodeVersion  string `json:"nodeVersion"`
+	IsAlive                  bool   `json:"isAlive"`
+	XrayInternalStatusCached bool   `json:"xrayInternalStatusCached"`
+	XrayVersion              string `json:"xrayVersion"`
+	NodeVersion              string `json:"nodeVersion"`
 }

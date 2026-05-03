@@ -243,10 +243,10 @@ func (s *Service) GetStatus() (*GetXrayStatusResponse, error) {
 // GetNodeHealthCheck returns the node health status
 func (s *Service) GetNodeHealthCheck() (*GetNodeHealthCheckResponse, error) {
 	return &GetNodeHealthCheckResponse{
-		IsHealthy:    true,
-		IsXrayOnline: s.isXrayOnline,
-		XrayVersion:  s.xrayVersion,
-		NodeVersion:  s.nodeVersion,
+		IsAlive:                  true,
+		XrayInternalStatusCached: s.isXrayOnline,
+		XrayVersion:              s.xrayVersion,
+		NodeVersion:              s.nodeVersion,
 	}, nil
 }
 

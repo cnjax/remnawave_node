@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	nodeVersion = "2.5.0"
+	nodeVersion = "2.7.0"
 )
 
 func main() {
@@ -65,7 +65,7 @@ func main() {
 	stateManager := state.NewManager()
 
 	// Create services
-	handlerService := handler.NewService(xrayClient, stateManager)
+	handlerService := handler.NewService(xrayClient, stateManager, cfg.DisableHashedSetCheck)
 	statsService := stats.NewService(xrayClient)
 	xrayService := xray.NewService(xrayClient, processManager, stateManager, cfg, nodeVersion)
 	visionService := vision.NewService(xrayClient)
@@ -110,22 +110,17 @@ func main() {
 
 	log.Info().Msg("Shutting down server...")
 
-	// Cleanup
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Stop Xray process
-	processManager.Cleanup()
-
-	// Shutdown server
+	// Drain in-flight HTTP requests first so gRPC calls can complete normally.
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Error().Err(err).Msg("Server shutdown error")
 	}
 
-	// Cleanup state
+	// Now safe to stop xray and clean up state/gRPC.
+	processManager.Cleanup()
 	stateManager.Cleanup()
-
-	// Close Xray client
 	if xrayClient != nil {
 		xrayClient.Close()
 	}

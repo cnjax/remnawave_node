@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/remnawave/remnanode/internal/errors"
 	"github.com/remnawave/remnanode/internal/handler"
 	internalapi "github.com/remnawave/remnanode/internal/internal_api"
 	"github.com/remnawave/remnanode/internal/server/middleware"
@@ -39,6 +40,9 @@ func (s *Server) setupRoutes() {
 	// Internal router routes (no JWT, but localhost only)
 	s.setupInternalRoutes()
 }
+
+// visionGroup is the route group for vision (IP blocking) endpoints
+const visionGroupPath = "/vision"
 
 // setupHandlerRoutes configures handler module routes
 func (s *Server) setupHandlerRoutes(group *gin.RouterGroup) {
@@ -113,14 +117,15 @@ func (s *Server) setupXrayRoutes(group *gin.RouterGroup) {
 
 // setupInternalRoutes configures internal API routes (localhost only)
 func (s *Server) setupInternalRoutes() {
-	// Vision routes - IP blocking (on internal server)
+	// Vision routes - IP blocking under /vision (matches TS contract VISION_CONTROLLER='vision')
+	visionGroup := s.internalRouter.Group(visionGroupPath)
 	v, ok := s.services.Vision.(*vision.Handler)
 	if ok && v != nil {
-		s.internalRouter.POST("/block-ip", v.BlockIP)
-		s.internalRouter.POST("/unblock-ip", v.UnblockIP)
+		visionGroup.POST("/block-ip", v.BlockIP)
+		visionGroup.POST("/unblock-ip", v.UnblockIP)
 	} else {
-		s.internalRouter.POST("/block-ip", notImplemented)
-		s.internalRouter.POST("/unblock-ip", notImplemented)
+		visionGroup.POST("/block-ip", notImplemented)
+		visionGroup.POST("/unblock-ip", notImplemented)
 	}
 
 	// Internal API routes
@@ -134,8 +139,5 @@ func (s *Server) setupInternalRoutes() {
 
 // notImplemented is a placeholder handler
 func notImplemented(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"isOk":    false,
-		"message": "Not implemented",
-	})
+	errors.SendError(c, errors.ErrNotImplemented)
 }

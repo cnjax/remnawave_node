@@ -90,4 +90,9 @@ var (
 		Message:  "Failed to get combined stats",
 		HTTPCode: http.StatusInternalServerError,
 	}
+	ErrNotImplemented = AppError{
+		Code:     "A018",
+		Message:  "Not implemented",
+		HTTPCode: http.StatusNotImplemented,
+	}
 )

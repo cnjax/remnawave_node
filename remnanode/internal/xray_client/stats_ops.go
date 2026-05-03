@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -70,22 +69,23 @@ func (c *Client) GetSysStats() (*SysStats, error) {
 	}, nil
 }
 
-// GetUserOnlineStatus checks if a user is currently online (has active traffic)
+// GetUserOnlineStatus checks if a user is currently online by reading the
+// dedicated online IP counter (user>>>{name}>>>online), matching TS xtls-sdk
+// behavior. Returns true only if xray has at least one active IP for the user.
 func (c *Client) GetUserOnlineStatus(username string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Query user stats to see if there's any recent traffic
-	resp, err := c.stats.QueryStats(ctx, &statsService.QueryStatsRequest{
-		Pattern: fmt.Sprintf("user>>>%s>>>traffic>>>", username),
-		Reset_:  false,
+	resp, err := c.stats.GetStatsOnlineIpList(ctx, &statsService.GetStatsRequest{
+		Name:   fmt.Sprintf("user>>>%s>>>online", username),
+		Reset_: false,
 	})
 	if err != nil {
-		return false, fmt.Errorf("failed to query user stats: %w", err)
+		// xray returns an error when the user has no online entry yet — treat as offline.
+		return false, nil
 	}
 
-	// User is considered online if they have any stats
-	return len(resp.Stat) > 0, nil
+	return len(resp.Ips) > 0, nil
 }
 
 // GetAllUsersStats gets statistics for all users
@@ -282,12 +282,13 @@ type OnlineUserIp struct {
 	LastSeen int64 // unix timestamp
 }
 
-// GetStatsOnlineIpList gets the list of IPs for a user (name = "user>>>userId>>>online")
-func (c *Client) GetStatsOnlineIpList(name string) ([]OnlineUserIp, error) {
+// GetStatsOnlineIpList gets the list of IPs for a user (name = "user>>>userId>>>online").
+// Pass reset=true only when the caller intentionally wants to clear the counter after reading.
+func (c *Client) GetStatsOnlineIpList(name string, reset bool) ([]OnlineUserIp, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	resp, err := c.stats.GetStatsOnlineIpList(ctx, &statsService.GetStatsRequest{Name: name, Reset_: true})
+	resp, err := c.stats.GetStatsOnlineIpList(ctx, &statsService.GetStatsRequest{Name: name, Reset_: reset})
 	if err != nil {
 		return nil, err
 	}
@@ -311,8 +312,3 @@ func (c *Client) GetAllOnlineUsers() ([]string, error) {
 	return resp.Users, nil
 }
 
-// parseTrafficValue parses a traffic stat value string to int64
-func parseTrafficValue(value string) int64 {
-	v, _ := strconv.ParseInt(value, 10, 64)
-	return v
-}

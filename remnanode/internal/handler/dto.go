@@ -67,7 +67,7 @@ type BulkUser struct {
 
 // AddUsersRequest represents the request to add multiple users
 type AddUsersRequest struct {
-	AffectedInboundTags []string   `json:"affectedInboundTags" binding:"required"`
+	AffectedInboundTags []string   `json:"affectedInboundTags"` // optional: empty means "sync all known inbounds"
 	Users               []BulkUser `json:"users" binding:"required"`
 }
 
