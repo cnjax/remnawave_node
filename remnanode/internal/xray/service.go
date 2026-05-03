@@ -2,6 +2,7 @@ package xray
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/remnawave/remnanode/internal/process"
 	"github.com/remnawave/remnanode/internal/state"
 	"github.com/remnawave/remnanode/internal/xray_client"
+	"github.com/remnawave/remnanode/pkg/capabilities"
+	"github.com/remnawave/remnanode/pkg/connkill"
 	"github.com/remnawave/remnanode/pkg/sysinfo"
 )
 
@@ -45,8 +48,9 @@ type Service struct {
 	nodeVersion           string
 	isXrayOnline          bool
 	isProcessing          bool
-	systemStats           *SystemInfo
+	systemInfo            *NodeSystemInfo
 	disableHashedSetCheck bool
+	hasCapNetAdmin        bool
 }
 
 // NewService creates a new Xray service
@@ -65,32 +69,54 @@ func NewService(
 		nodeVersion:           nodeVersion,
 		xrayVersion:           cfg.XrayCoreVersion,
 		disableHashedSetCheck: cfg.DisableHashedSetCheck,
+		hasCapNetAdmin:        capabilities.HasCapNetAdmin(),
 	}
 
-	// Get system stats on initialization
-	s.loadSystemStats()
-
+	s.loadSystemInfo()
 	return s
 }
 
-// loadSystemStats loads system information
-func (s *Service) loadSystemStats() {
+// loadSystemInfo reads static system information once at startup.
+func (s *Service) loadSystemInfo() {
 	info, err := sysinfo.GetSystemInfo()
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get system info")
 		return
 	}
 
-	s.systemStats = &SystemInfo{
-		CPUCores:    info.CPUs,
-		CPUModel:    info.CPUModel,
-		MemoryTotal: formatBytes(info.MemoryTotal),
+	s.systemInfo = &NodeSystemInfo{
+		Arch:              info.Arch,
+		CPUs:              info.CPUs,
+		CPUModel:          info.CPUModel,
+		MemoryTotal:       info.MemoryTotal,
+		Hostname:          info.Hostname,
+		Platform:          info.Platform,
+		Release:           info.Release,
+		Type:              info.Type,
+		Version:           info.Version,
+		NetworkInterfaces: info.NetworkInterfaces,
 	}
+}
+
+// buildNodeSystem assembles the NodeSystem response object with live stats.
+func (s *Service) buildNodeSystem() *NodeSystem {
+	stats, err := sysinfo.GetSystemStats()
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to get system stats for response")
+	}
+
+	ns := &NodeSystem{
+		Info:  s.systemInfo,
+		Stats: stats,
+	}
+	if stats != nil {
+		ns.Interface = stats.Interface
+	}
+	return ns
 }
 
 // StartXray starts the Xray process with the given configuration
 func (s *Service) StartXray(req *StartXrayRequest, clientIP string) (resp *StartXrayResponse, err error) {
-	// Recover from any panic
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error().Interface("panic", r).Msg("PANIC in StartXray")
@@ -138,17 +164,15 @@ func (s *Service) StartXray(req *StartXrayRequest, clientIP string) (resp *Start
 
 	// Check if restart is needed
 	if s.isXrayOnline && !s.disableHashedSetCheck && !req.Internals.ForceRestart && s.xrayClient != nil {
-		// Check if Xray is healthy
 		_, err := s.xrayClient.GetSysStats()
 		if err == nil {
-			// Xray is healthy, check if config changed
 			if !s.stateManager.IsNeedRestartCore(req.Internals.Hashes) {
 				log.Info().Msg("Xray is healthy and config unchanged, skipping restart")
 				return &StartXrayResponse{
-					IsStarted:         true,
-					Version:           &s.xrayVersion,
-					SystemInformation: s.systemStats,
-					NodeInformation:   &NodeInformation{Version: s.nodeVersion},
+					IsStarted:       true,
+					Version:         &s.xrayVersion,
+					System:          s.buildNodeSystem(),
+					NodeInformation: &NodeInformation{Version: s.nodeVersion},
 				}, nil
 			}
 		} else {
@@ -161,15 +185,16 @@ func (s *Service) StartXray(req *StartXrayRequest, clientIP string) (resp *Start
 		log.Warn().Msg("Force restart requested")
 	}
 
-	// Generate full config with API settings
 	log.Info().Msg("Generating full config with API settings")
-	fullConfig := GenerateAPIConfig(req.XrayConfig)
+	fullConfig := GenerateAPIConfig(
+		req.XrayConfig,
+		s.config.XtlsPort,
+		s.hasCapNetAdmin,
+	)
 
-	// Extract users from config and store it (for /internal/get-config endpoint)
 	log.Info().Msg("Extracting users from config")
 	s.stateManager.ExtractUsersFromConfig(req.Internals.Hashes, fullConfig)
 
-	// Restart Xray process directly
 	log.Info().Msg("Restarting Xray process")
 	if err := s.processManager.Restart(); err != nil {
 		log.Error().Err(err).Msg("Failed to restart Xray process")
@@ -182,7 +207,6 @@ func (s *Service) StartXray(req *StartXrayRequest, clientIP string) (resp *Start
 	}
 
 	log.Info().Msg("Xray process started, checking health via gRPC")
-	// Check if Xray started successfully
 	isStarted := s.checkXrayHealth()
 
 	if !isStarted {
@@ -198,11 +222,11 @@ func (s *Service) StartXray(req *StartXrayRequest, clientIP string) (resp *Start
 			Msg("Xray failed to start")
 
 		return &StartXrayResponse{
-			IsStarted:         false,
-			Version:           &s.xrayVersion,
-			Error:             &errMsg,
-			SystemInformation: s.systemStats,
-			NodeInformation:   &NodeInformation{Version: s.nodeVersion},
+			IsStarted:       false,
+			Version:         &s.xrayVersion,
+			Error:           &errMsg,
+			System:          s.buildNodeSystem(),
+			NodeInformation: &NodeInformation{Version: s.nodeVersion},
 		}, nil
 	}
 
@@ -214,15 +238,41 @@ func (s *Service) StartXray(req *StartXrayRequest, clientIP string) (resp *Start
 		Msg("Xray started successfully")
 
 	return &StartXrayResponse{
-		IsStarted:         true,
-		Version:           &s.xrayVersion,
-		SystemInformation: s.systemStats,
-		NodeInformation:   &NodeInformation{Version: s.nodeVersion},
+		IsStarted:       true,
+		Version:         &s.xrayVersion,
+		System:          s.buildNodeSystem(),
+		NodeInformation: &NodeInformation{Version: s.nodeVersion},
 	}, nil
 }
 
-// StopXray stops the Xray process
-func (s *Service) StopXray() (*StopXrayResponse, error) {
+// StopXrayOptions controls optional behavior during shutdown.
+type StopXrayOptions struct {
+	// WithOnlineCheck: if true and CAP_NET_ADMIN is available, drop all online
+	// users' TCP connections before stopping xray (matching TS withOnlineCheck).
+	WithOnlineCheck bool
+	// WithPluginCleanup: stub — will trigger plugin teardown once plugin module
+	// is implemented (matching TS withPluginCleanup).
+	WithPluginCleanup bool
+}
+
+// StopXray stops the Xray process.
+// Call as StopXray() for a plain stop or StopXray(StopXrayOptions{...}) with options.
+func (s *Service) StopXray(opts ...StopXrayOptions) (*StopXrayResponse, error) {
+	var o StopXrayOptions
+	if len(opts) > 0 {
+		o = opts[0]
+	}
+
+	// Drop all online connections before stopping xray if requested.
+	if o.WithOnlineCheck && s.hasCapNetAdmin && s.xrayClient != nil {
+		s.dropAllOnlineConnections()
+	}
+
+	if o.WithPluginCleanup {
+		// Plugin cleanup stub — will be wired to the plugin module in the future.
+		log.Info().Msg("StopXray: withPluginCleanup requested (stub, no-op)")
+	}
+
 	if err := s.processManager.Stop(); err != nil {
 		log.Error().Err(err).Msg("Failed to stop Xray process")
 		return &StopXrayResponse{IsStopped: false}, nil
@@ -232,6 +282,47 @@ func (s *Service) StopXray() (*StopXrayResponse, error) {
 	s.stateManager.Cleanup()
 
 	return &StopXrayResponse{IsStopped: true}, nil
+}
+
+// dropAllOnlineConnections retrieves all online users from xray and RSTs their TCP connections.
+func (s *Service) dropAllOnlineConnections() {
+	onlineUsers, err := s.xrayClient.GetAllOnlineUsers()
+	if err != nil {
+		log.Warn().Err(err).Msg("dropAllOnlineConnections: failed to get online users")
+		return
+	}
+
+	var allIPs []string
+	seen := make(map[string]struct{})
+	for _, raw := range onlineUsers {
+		// raw format: "user>>>userId>>>online"
+		parts := strings.Split(raw, ">>>")
+		if len(parts) < 2 {
+			continue
+		}
+		userID := parts[1]
+		if _, ok := seen[userID]; ok {
+			continue
+		}
+		seen[userID] = struct{}{}
+
+		ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>"+userID+">>>online", false)
+		if err != nil {
+			continue
+		}
+		for _, ip := range ips {
+			allIPs = append(allIPs, ip.IP)
+		}
+	}
+
+	if len(allIPs) == 0 {
+		return
+	}
+
+	log.Info().Int("ips", len(allIPs)).Msg("Dropping all online connections before xray stop")
+	if err := connkill.DropByIPs(allIPs); err != nil {
+		log.Warn().Err(err).Msg("Failed to drop all online connections")
+	}
 }
 
 // GetStatus returns the current Xray status

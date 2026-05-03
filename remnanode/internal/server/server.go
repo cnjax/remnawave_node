@@ -49,6 +49,7 @@ func New(cfg *config.Config, services *Services) (*Server, error) {
 	mainRouter.Use(middleware.SecureHeaders())
 	mainRouter.Use(middleware.BodyLimit(bodyLimitBytes))
 	mainRouter.Use(middleware.GzipDecompress()) // Decompress gzip request bodies
+	mainRouter.Use(middleware.GzipCompress())   // Compress gzip response bodies (matching TS compression())
 	mainRouter.Use(middleware.APIDiagnostics())
 	if config.IsDevelopment() {
 		mainRouter.Use(middleware.Logger())
@@ -63,6 +64,7 @@ func New(cfg *config.Config, services *Services) (*Server, error) {
 	internalRouter.Use(middleware.Recovery())
 	internalRouter.Use(middleware.BodyLimit(bodyLimitBytes))
 	internalRouter.Use(middleware.InternalOnly())
+	internalRouter.Use(middleware.TokenAuth(cfg.InternalRestToken))
 	internalRouter.Use(middleware.APIDiagnostics())
 	// Internal router also ignores proxy headers — it only accepts localhost connections.
 	if err := internalRouter.SetTrustedProxies(nil); err != nil {
@@ -78,6 +80,10 @@ func New(cfg *config.Config, services *Services) (*Server, error) {
 
 	// Setup routes
 	server.setupRoutes()
+
+	// Close connection on unmatched routes (TS behavior)
+	mainRouter.NoRoute(func(c *gin.Context) { middleware.CloseUnknownRoute(c) })
+	internalRouter.NoRoute(func(c *gin.Context) { middleware.CloseUnknownRoute(c) })
 
 	return server, nil
 }

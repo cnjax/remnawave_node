@@ -20,7 +20,7 @@ func NewHandler(service *Service) *Handler {
 func (h *Handler) AddUser(c *gin.Context) {
 	var req AddUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -37,7 +37,7 @@ func (h *Handler) AddUser(c *gin.Context) {
 func (h *Handler) AddUsers(c *gin.Context) {
 	var req AddUsersRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -54,7 +54,7 @@ func (h *Handler) AddUsers(c *gin.Context) {
 func (h *Handler) RemoveUser(c *gin.Context) {
 	var req RemoveUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *Handler) RemoveUser(c *gin.Context) {
 func (h *Handler) RemoveUsers(c *gin.Context) {
 	var req RemoveUsersRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -88,7 +88,7 @@ func (h *Handler) RemoveUsers(c *gin.Context) {
 func (h *Handler) GetInboundUsers(c *gin.Context) {
 	var req GetInboundUsersRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -105,7 +105,7 @@ func (h *Handler) GetInboundUsers(c *gin.Context) {
 func (h *Handler) GetInboundUsersCount(c *gin.Context) {
 	var req GetInboundUsersCountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -122,7 +122,7 @@ func (h *Handler) GetInboundUsersCount(c *gin.Context) {
 func (h *Handler) DropUsersConnections(c *gin.Context) {
 	var req DropUsersConnectionsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -139,7 +139,7 @@ func (h *Handler) DropUsersConnections(c *gin.Context) {
 func (h *Handler) DropIps(c *gin.Context) {
 	var req DropIpsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 

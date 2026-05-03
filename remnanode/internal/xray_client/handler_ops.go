@@ -3,6 +3,7 @@ package xray_client
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/xtls/xray-core/app/proxyman/command"
@@ -117,7 +118,8 @@ func (c *Client) AddShadowsocksUser(tag, username, password string, cipherType C
 	return nil
 }
 
-// RemoveUser removes a user from an inbound
+// RemoveUser removes a user from an inbound.
+// "not found" / code=5 errors are silently ignored; all other errors are returned.
 func (c *Client) RemoveUser(tag, username string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -129,10 +131,12 @@ func (c *Client) RemoveUser(tag, username string) error {
 		}),
 	})
 
-	// Ignore "not found" errors as the user might not exist
 	if err != nil {
-		// TODO: Check if error is "user not found" and ignore it
-		return nil
+		msg := err.Error()
+		if strings.Contains(msg, "not found") || strings.Contains(msg, "code = NotFound") {
+			return nil
+		}
+		return fmt.Errorf("remove user %q from %q: %w", username, tag, err)
 	}
 
 	return nil
@@ -143,15 +147,27 @@ type InboundUser struct {
 	Username string
 	Email    string
 	Level    uint32
-	Protocol string
 }
 
-// GetInboundUsers gets all users in an inbound
-// Note: This requires Xray core to support GetInboundUsers which may not be available in all versions
+// GetInboundUsers gets all users in an inbound via HandlerService.GetInboundUsers.
 func (c *Client) GetInboundUsers(tag string) ([]InboundUser, error) {
-	// This is a simplified implementation
-	// The actual implementation depends on Xray core version and available APIs
-	return []InboundUser{}, nil
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := c.handler.GetInboundUsers(ctx, &command.GetInboundUserRequest{Tag: tag})
+	if err != nil {
+		return nil, fmt.Errorf("GetInboundUsers %q: %w", tag, err)
+	}
+
+	users := make([]InboundUser, 0, len(resp.Users))
+	for _, u := range resp.Users {
+		users = append(users, InboundUser{
+			Username: u.Email,
+			Email:    u.Email,
+			Level:    u.Level,
+		})
+	}
+	return users, nil
 }
 
 // GetInboundUsersCount gets the count of users in an inbound

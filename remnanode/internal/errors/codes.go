@@ -95,4 +95,14 @@ var (
 		Message:  "Not implemented",
 		HTTPCode: http.StatusNotImplemented,
 	}
+	ErrInternalOnlyAccess = AppError{
+		Code:     "A019",
+		Message:  "Access denied: internal API only",
+		HTTPCode: http.StatusForbidden,
+	}
+	ErrValidation = AppError{
+		Code:     "A020",
+		Message:  "Validation error",
+		HTTPCode: http.StatusBadRequest,
+	}
 )

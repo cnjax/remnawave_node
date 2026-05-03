@@ -8,8 +8,9 @@ pidfile="/run/${RC_SVCNAME}.pid"
 output_log="/var/log/remnanode.log"
 error_log="/var/log/remnanode.err.log"
 
-# Put SECRET_KEY, NODE_PORT, XRAY_CORE_VERSION, and related variables in:
-#   /etc/conf.d/remnanode
+# Put required variables (SECRET_KEY, NODE_PORT, INTERNAL_REST_TOKEN)
+# and optional ones in:  /etc/conf.d/remnanode
+# See contrib/remnanode.env.example for the full list.
 
 depend() {
 	need net

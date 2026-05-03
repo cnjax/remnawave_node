@@ -6,8 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-
-	"github.com/remnawave/remnanode/internal/errors"
 )
 
 // JWTMiddleware creates a JWT authentication middleware using RS256
@@ -22,16 +20,14 @@ func JWTMiddleware(publicKeyPEM string) gin.HandlerFunc {
 		// Extract token from Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			errors.SendError(c, errors.ErrUnauthorized)
-			c.Abort()
+			hijackAndClose(c)
 			return
 		}
 
 		// Check for Bearer prefix
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			errors.SendError(c, errors.ErrUnauthorized)
-			c.Abort()
+			hijackAndClose(c)
 			return
 		}
 
@@ -46,8 +42,7 @@ func JWTMiddleware(publicKeyPEM string) gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
-			errors.SendError(c, errors.ErrUnauthorized)
-			c.Abort()
+			hijackAndClose(c)
 			return
 		}
 

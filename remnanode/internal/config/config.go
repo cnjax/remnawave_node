@@ -14,6 +14,7 @@ type Config struct {
 	DisableHashedSetCheck bool
 	XrayCoreVersion       string
 	XrayBinaryPath        string
+	InternalRestToken     string
 	TLS                   TLSConfig
 	JWTPublicKey          string
 }

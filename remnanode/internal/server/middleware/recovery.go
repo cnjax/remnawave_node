@@ -1,11 +1,12 @@
 package middleware
 
 import (
-	"net/http"
 	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+
+	"github.com/remnawave/remnanode/internal/errors"
 )
 
 // Recovery returns a middleware that recovers from panics
@@ -13,7 +14,6 @@ func Recovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
-				// Log the panic with stack trace
 				log.Error().
 					Interface("error", err).
 					Str("stack", string(debug.Stack())).
@@ -21,12 +21,7 @@ func Recovery() gin.HandlerFunc {
 					Str("method", c.Request.Method).
 					Msg("panic recovered")
 
-				// Return 500 error
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"isOk":    false,
-					"code":    "A001",
-					"message": "Internal server error",
-				})
+				errors.SendError(c, errors.ErrInternalServer)
 				c.Abort()
 			}
 		}()

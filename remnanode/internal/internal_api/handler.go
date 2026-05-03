@@ -1,6 +1,7 @@
 package internal_api
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -35,4 +36,19 @@ func (h *Handler) GetConfig(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, config)
+}
+
+// Webhook handles POST /internal/webhook — receives xray callback events.
+// Currently logs and discards; event dispatch will be wired up with the plugin module.
+func (h *Handler) Webhook(c *gin.Context) {
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		log.Warn().Err(err).Msg("Internal API: Webhook failed to read body")
+	} else {
+		log.Info().
+			Str("clientIP", c.ClientIP()).
+			Int("bodyLen", len(body)).
+			Msg("Internal API: Webhook received")
+	}
+	c.Status(http.StatusOK)
 }

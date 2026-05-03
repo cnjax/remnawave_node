@@ -15,8 +15,8 @@ type RemoveUserResponse struct {
 // InboundUser represents a user in an inbound
 type InboundUser struct {
 	Username string `json:"username"`
+	Email    string `json:"email,omitempty"`
 	Level    uint32 `json:"level,omitempty"`
-	Protocol string `json:"protocol"`
 }
 
 // GetInboundUsersResponse represents the response for getting inbound users

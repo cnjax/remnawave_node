@@ -125,10 +125,18 @@ func (s *Server) setupPluginRoutes(group *gin.RouterGroup) {
 	p, ok := s.services.Plugin.(*plugin.Handler)
 	if !ok || p == nil {
 		group.POST("/sync", notImplemented)
+		group.POST("/torrent-blocker/collect", notImplemented)
+		group.POST("/nftables/block-ips", notImplemented)
+		group.POST("/nftables/unblock-ips", notImplemented)
+		group.POST("/nftables/recreate-tables", notImplemented)
 		return
 	}
 
 	group.POST("/sync", p.Sync)
+	group.POST("/torrent-blocker/collect", p.TorrentBlockerCollect)
+	group.POST("/nftables/block-ips", p.NftablesBlockIps)
+	group.POST("/nftables/unblock-ips", p.NftablesUnblockIps)
+	group.POST("/nftables/recreate-tables", p.NftablesRecreateTables)
 }
 
 // setupInternalRoutes configures internal API routes (localhost only)
@@ -148,8 +156,10 @@ func (s *Server) setupInternalRoutes() {
 	internal, ok := s.services.InternalAPI.(*internalapi.Handler)
 	if ok && internal != nil {
 		s.internalRouter.GET("/internal/get-config", internal.GetConfig)
+		s.internalRouter.POST("/internal/webhook", internal.Webhook)
 	} else {
 		s.internalRouter.GET("/internal/get-config", notImplemented)
+		s.internalRouter.POST("/internal/webhook", notImplemented)
 	}
 }
 

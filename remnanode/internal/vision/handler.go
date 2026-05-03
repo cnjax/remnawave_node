@@ -20,7 +20,7 @@ func NewHandler(service *Service) *Handler {
 func (h *Handler) BlockIP(c *gin.Context) {
 	var req BlockIPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -37,7 +37,7 @@ func (h *Handler) BlockIP(c *gin.Context) {
 func (h *Handler) UnblockIP(c *gin.Context) {
 	var req UnblockIPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 

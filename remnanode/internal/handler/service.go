@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
@@ -9,14 +10,20 @@ import (
 
 	"github.com/remnawave/remnanode/internal/state"
 	"github.com/remnawave/remnanode/internal/xray_client"
+	"github.com/remnawave/remnanode/pkg/capabilities"
 	"github.com/remnawave/remnanode/pkg/connkill"
 )
+
+func encodeBase64(s string) string {
+	return base64.StdEncoding.EncodeToString([]byte(s))
+}
 
 // Service handles user management operations
 type Service struct {
 	xrayClient            *xray_client.Client
 	stateManager          *state.Manager
 	disableHashedSetCheck bool
+	hasCapNetAdmin        bool
 }
 
 // NewService creates a new handler service
@@ -25,6 +32,7 @@ func NewService(xrayClient *xray_client.Client, stateManager *state.Manager, dis
 		xrayClient:            xrayClient,
 		stateManager:          stateManager,
 		disableHashedSetCheck: disableHashedSetCheck,
+		hasCapNetAdmin:        capabilities.HasCapNetAdmin(),
 	}
 }
 
@@ -43,16 +51,16 @@ func validateInboundUser(item InboundUserData) error {
 			return fmt.Errorf("trojan user %q: password is required", item.Username)
 		}
 	case UserTypeShadowsocks:
-		if item.Password == "" || item.CipherType == xray_client.CipherTypeUnknown {
-			return fmt.Errorf("shadowsocks user %q: password and cipherType are required", item.Username)
+		if item.Password == "" {
+			return fmt.Errorf("shadowsocks user %q: password is required", item.Username)
 		}
 	case UserTypeShadowsocks22:
 		if item.Password == "" {
 			return fmt.Errorf("shadowsocks22 user %q: password is required", item.Username)
 		}
 	case UserTypeHysteria:
-		if item.Password == "" {
-			return fmt.Errorf("hysteria user %q: password is required", item.Username)
+		if item.UUID == "" {
+			return fmt.Errorf("hysteria user %q: uuid is required", item.Username)
 		}
 	}
 	return nil
@@ -109,9 +117,9 @@ func (s *Service) AddUser(req *AddUserRequest) (*AddUserResponse, error) {
 		case UserTypeShadowsocks:
 			err = s.xrayClient.AddShadowsocksUser(item.Tag, item.Username, item.Password, item.CipherType, item.IVCheck)
 		case UserTypeShadowsocks22:
-			err = s.xrayClient.AddShadowsocks2022User(item.Tag, item.Username, item.Password)
+			err = s.xrayClient.AddShadowsocks2022User(item.Tag, item.Username, encodeBase64(item.Password))
 		case UserTypeHysteria:
-			err = s.xrayClient.AddHysteriaUser(item.Tag, item.Username, item.Password)
+			err = s.xrayClient.AddHysteriaUser(item.Tag, item.Username, item.UUID)
 		}
 
 		if err != nil {
@@ -167,7 +175,30 @@ func (s *Service) RemoveUser(req *RemoveUserRequest) (*RemoveUserResponse, error
 		return &RemoveUserResponse{Success: false, Error: strPtr(lastError.Error())}, nil
 	}
 
+	// Drop TCP connections for the removed user (matching TS DropConnectionsEvent).
+	// Only possible when CAP_NET_ADMIN is available.
+	if s.hasCapNetAdmin {
+		s.dropUserConnections(req.Username)
+	}
+
 	return &RemoveUserResponse{Success: true, Error: nil}, nil
+}
+
+// dropUserConnections gets the user's online IPs from xray stats and RSTs them.
+func (s *Service) dropUserConnections(username string) {
+	ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>"+username+">>>online", false)
+	if err != nil || len(ips) == 0 {
+		return
+	}
+	addrs := make([]string, 0, len(ips))
+	for _, ip := range ips {
+		addrs = append(addrs, ip.IP)
+	}
+	if err := connkill.DropByIPs(addrs); err != nil {
+		log.Warn().Err(err).Str("username", username).Msg("Failed to drop connections after user removal")
+	} else {
+		log.Debug().Str("username", username).Int("count", len(addrs)).Msg("Dropped connections after user removal")
+	}
 }
 
 // AddUsers adds multiple users in bulk
@@ -210,11 +241,14 @@ func (s *Service) AddUsers(req *AddUsersRequest) (*AddUserResponse, error) {
 			case UserTypeTrojan:
 				err = s.xrayClient.AddTrojanUser(inbound.Tag, user.UserData.UserID, user.UserData.TrojanPassword)
 			case UserTypeShadowsocks:
-				err = s.xrayClient.AddShadowsocksUser(inbound.Tag, user.UserData.UserID, user.UserData.SSPassword, xray_client.CipherTypeCHACHA20POLY1305, false)
+				// cipher 0 (unknown) lets xray auto-select, matching TS behavior
+				err = s.xrayClient.AddShadowsocksUser(inbound.Tag, user.UserData.UserID, user.UserData.SSPassword, xray_client.CipherTypeUnknown, false)
 			case UserTypeShadowsocks22:
-				err = s.xrayClient.AddShadowsocks2022User(inbound.Tag, user.UserData.UserID, user.UserData.SSPassword)
+				// SS2022 key must be base64-encoded
+				err = s.xrayClient.AddShadowsocks2022User(inbound.Tag, user.UserData.UserID, encodeBase64(user.UserData.SSPassword))
 			case UserTypeHysteria:
-				err = s.xrayClient.AddHysteriaUser(inbound.Tag, user.UserData.UserID, user.UserData.TrojanPassword)
+				// Hysteria auth field is the VLESS UUID, not the trojan password
+				err = s.xrayClient.AddHysteriaUser(inbound.Tag, user.UserData.UserID, user.UserData.VlessUUID)
 			}
 
 			if err == nil && !s.disableHashedSetCheck {
@@ -289,8 +323,8 @@ func (s *Service) GetInboundUsers(tag string) (*GetInboundUsersResponse, error) 
 	for i, u := range users {
 		result[i] = InboundUser{
 			Username: u.Username,
+			Email:    u.Email,
 			Level:    u.Level,
-			Protocol: u.Protocol,
 		}
 	}
 
@@ -308,7 +342,13 @@ func (s *Service) GetInboundUsersCount(tag string) (*GetInboundUsersCountRespons
 }
 
 // DropUsersConnections RSTs all TCP connections for the given user IDs.
+// Requires CAP_NET_ADMIN; returns success immediately if unavailable.
 func (s *Service) DropUsersConnections(req *DropUsersConnectionsRequest) (*GenericResponse, error) {
+	if !s.hasCapNetAdmin {
+		log.Warn().Msg("DropUsersConnections: CAP_NET_ADMIN unavailable, skipping")
+		return &GenericResponse{Success: true}, nil
+	}
+
 	var allIPs []string
 	for _, userID := range req.UserIDs {
 		ips, err := s.xrayClient.GetStatsOnlineIpList("user>>>"+userID+">>>online", false)
@@ -329,7 +369,12 @@ func (s *Service) DropUsersConnections(req *DropUsersConnectionsRequest) (*Gener
 }
 
 // DropIps RSTs all TCP connections from the given IP addresses via SOCK_DESTROY.
+// Requires CAP_NET_ADMIN; returns success immediately if unavailable.
 func (s *Service) DropIps(req *DropIpsRequest) (*GenericResponse, error) {
+	if !s.hasCapNetAdmin {
+		log.Warn().Msg("DropIps: CAP_NET_ADMIN unavailable, skipping")
+		return &GenericResponse{Success: true}, nil
+	}
 	if err := connkill.DropByIPs(req.IPs); err != nil {
 		log.Warn().Err(err).Msg("Failed to drop connections by IP")
 	}

@@ -31,7 +31,7 @@ func (h *Handler) GetSystemStats(c *gin.Context) {
 func (h *Handler) GetUserOnlineStatus(c *gin.Context) {
 	var req GetUserOnlineStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -48,7 +48,7 @@ func (h *Handler) GetUserOnlineStatus(c *gin.Context) {
 func (h *Handler) GetUsersStats(c *gin.Context) {
 	var req GetUsersStatsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -65,7 +65,7 @@ func (h *Handler) GetUsersStats(c *gin.Context) {
 func (h *Handler) GetInboundStats(c *gin.Context) {
 	var req GetInboundStatsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -82,7 +82,7 @@ func (h *Handler) GetInboundStats(c *gin.Context) {
 func (h *Handler) GetOutboundStats(c *gin.Context) {
 	var req GetOutboundStatsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -99,7 +99,7 @@ func (h *Handler) GetOutboundStats(c *gin.Context) {
 func (h *Handler) GetAllInboundsStats(c *gin.Context) {
 	var req GetAllInboundsStatsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -116,7 +116,7 @@ func (h *Handler) GetAllInboundsStats(c *gin.Context) {
 func (h *Handler) GetAllOutboundsStats(c *gin.Context) {
 	var req GetAllOutboundsStatsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -133,7 +133,7 @@ func (h *Handler) GetAllOutboundsStats(c *gin.Context) {
 func (h *Handler) GetCombinedStats(c *gin.Context) {
 	var req GetCombinedStatsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 
@@ -150,7 +150,7 @@ func (h *Handler) GetCombinedStats(c *gin.Context) {
 func (h *Handler) GetUserIpList(c *gin.Context) {
 	var req GetUserIpListRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 

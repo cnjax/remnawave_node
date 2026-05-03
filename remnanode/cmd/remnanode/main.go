@@ -47,7 +47,7 @@ func main() {
 		Str("xray_binary", cfg.XrayBinaryPath).
 		Msg("Configuration loaded")
 
-	// Create Xray gRPC client
+	// Create Xray gRPC client (mTLS with ephemeral certs from pkg/mtls)
 	xrayClient, err := xray_client.NewClient(cfg.XtlsIP, cfg.XtlsPort)
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to create Xray client (will retry on requests)")

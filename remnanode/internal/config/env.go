@@ -45,6 +45,12 @@ func LoadConfig() (*Config, error) {
 	// Get Xray binary path (default: /usr/local/bin/rw-core)
 	xrayBinaryPath := getEnvOrDefault("XRAY_BINARY_PATH", "/usr/local/bin/rw-core")
 
+	// INTERNAL_REST_TOKEN is required — protects /internal/* endpoints
+	internalRestToken := os.Getenv("INTERNAL_REST_TOKEN")
+	if internalRestToken == "" {
+		return nil, fmt.Errorf("INTERNAL_REST_TOKEN environment variable is required")
+	}
+
 	return &Config{
 		NodePort:              nodePort,
 		XtlsIP:                xtlsIP,
@@ -52,6 +58,7 @@ func LoadConfig() (*Config, error) {
 		DisableHashedSetCheck: disableHashedSetCheck,
 		XrayCoreVersion:       xrayCoreVersion,
 		XrayBinaryPath:        xrayBinaryPath,
+		InternalRestToken:     internalRestToken,
 		TLS: TLSConfig{
 			CACertPem:   payload.CACertPem,
 			NodeCertPem: payload.NodeCertPem,

@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
+	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
+	kgzip "github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
 	"github.com/rs/zerolog/log"
 )
@@ -142,6 +145,57 @@ func GzipDecompress() gin.HandlerFunc {
 			// Not compressed, restore original body
 			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
+
+		c.Next()
+	}
+}
+
+// gzipWriter wraps gin.ResponseWriter and compresses the response body.
+type gzipWriter struct {
+	gin.ResponseWriter
+	gz *kgzip.Writer
+}
+
+func (g *gzipWriter) Write(data []byte) (int, error) {
+	return g.gz.Write(data)
+}
+
+func (g *gzipWriter) WriteString(s string) (int, error) {
+	return g.gz.Write([]byte(s))
+}
+
+var gzipPool = sync.Pool{
+	New: func() interface{} {
+		gz, _ := kgzip.NewWriterLevel(nil, kgzip.DefaultCompression)
+		return gz
+	},
+}
+
+// GzipCompress adds gzip response compression when the client sends
+// Accept-Encoding: gzip, matching TS app.use(compression()) behavior.
+func GzipCompress() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
+			c.Next()
+			return
+		}
+
+		gz := gzipPool.Get().(*kgzip.Writer)
+		gz.Reset(c.Writer)
+
+		c.Header("Content-Encoding", "gzip")
+		c.Header("Vary", "Accept-Encoding")
+		// Content-Length is unknown after compression; remove to avoid mismatch.
+		c.Writer.Header().Del("Content-Length")
+
+		gw := &gzipWriter{ResponseWriter: c.Writer, gz: gz}
+		c.Writer = gw
+
+		defer func() {
+			// Ensure the gzip footer is written even if handler panics.
+			gz.Close()
+			gzipPool.Put(gz)
+		}()
 
 		c.Next()
 	}

@@ -22,7 +22,7 @@ func (h *Handler) Start(c *gin.Context) {
 	var req StartXrayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Error().Err(err).Msg("Failed to bind xray start request")
-		errors.SendErrorWithMessage(c, errors.ErrInternalServer, err.Error())
+		errors.SendErrorWithMessage(c, errors.ErrValidation, err.Error())
 		return
 	}
 

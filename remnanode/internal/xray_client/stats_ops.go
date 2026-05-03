@@ -69,23 +69,23 @@ func (c *Client) GetSysStats() (*SysStats, error) {
 	}, nil
 }
 
-// GetUserOnlineStatus checks if a user is currently online by reading the
-// dedicated online IP counter (user>>>{name}>>>online), matching TS xtls-sdk
-// behavior. Returns true only if xray has at least one active IP for the user.
+// GetUserOnlineStatus checks if a user is currently online via the GetStats
+// online counter (user>>>{name}>>>online), matching TS xtls-sdk getUserOnlineStatus.
+// Returns true only when the counter value is > 0.
 func (c *Client) GetUserOnlineStatus(username string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	resp, err := c.stats.GetStatsOnlineIpList(ctx, &statsService.GetStatsRequest{
+	resp, err := c.stats.GetStats(ctx, &statsService.GetStatsRequest{
 		Name:   fmt.Sprintf("user>>>%s>>>online", username),
 		Reset_: false,
 	})
 	if err != nil {
-		// xray returns an error when the user has no online entry yet — treat as offline.
+		// xray returns not-found when the user has no online counter — treat as offline.
 		return false, nil
 	}
 
-	return len(resp.Ips) > 0, nil
+	return resp.Stat != nil && resp.Stat.Value > 0, nil
 }
 
 // GetAllUsersStats gets statistics for all users
