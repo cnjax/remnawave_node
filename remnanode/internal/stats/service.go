@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/remnawave/remnanode/internal/xray_client"
-	"github.com/remnawave/remnanode/pkg/sysinfo"
 )
 
 // Service handles statistics operations
@@ -23,38 +22,22 @@ func NewService(xrayClient *xray_client.Client) *Service {
 // GetSystemStats retrieves system statistics
 func (s *Service) GetSystemStats() (*GetSystemStatsResponse, error) {
 	rawStats, err := s.xrayClient.GetSysStats()
-
-	var xrayInfo *XrayInfo
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to get xray sys stats")
-	} else {
-		xrayInfo = &XrayInfo{
-			NumGoroutine: rawStats.NumGoroutine,
-			NumGC:        rawStats.NumGC,
-			Alloc:        rawStats.Alloc,
-			TotalAlloc:   rawStats.TotalAlloc,
-			Sys:          rawStats.Sys,
-			Mallocs:      rawStats.Mallocs,
-			Frees:        rawStats.Frees,
-			LiveObjects:  rawStats.LiveObjects,
-			PauseTotalNs: rawStats.PauseTotalNs,
-			Uptime:       rawStats.Uptime,
-		}
+		return nil, err
 	}
-
-	sysStat, sysErr := sysinfo.GetSystemStats()
-	if sysErr != nil {
-		log.Warn().Err(sysErr).Msg("Failed to get system stats")
-		sysStat = &sysinfo.SystemStats{LoadAvg: []float64{0, 0, 0}}
-	}
-
-	var plugins PluginStats
-	plugins.TorrentBlocker.ReportsCount = 0
 
 	return &GetSystemStatsResponse{
-		XrayInfo: xrayInfo,
-		Plugins:  plugins,
-		System:   SystemStatsWrapper{Stats: sysStat},
+		NumGoroutine: rawStats.NumGoroutine,
+		NumGC:        rawStats.NumGC,
+		Alloc:        rawStats.Alloc,
+		TotalAlloc:   rawStats.TotalAlloc,
+		Sys:          rawStats.Sys,
+		Mallocs:      rawStats.Mallocs,
+		Frees:        rawStats.Frees,
+		LiveObjects:  rawStats.LiveObjects,
+		PauseTotalNs: rawStats.PauseTotalNs,
+		Uptime:       rawStats.Uptime,
 	}, nil
 }
 

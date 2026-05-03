@@ -8,13 +8,15 @@ Alpine Linux — `root@103.179.44.9 -p 50413`
 
 | Path | Description |
 |---|---|
-| `/root/remnanode` | Our Go binary |
+| `/usr/local/bin/remnanode` | Our Go binary |
 | `/usr/local/bin/rw-core` | Xray-core binary (latest release) |
-| Service name | `node` (OpenRC) |
+| Service name | `remnanode` (OpenRC) |
+| Env file | `/etc/conf.d/remnanode` |
+| Logs | `/var/log/remnanode.log`, `/var/log/remnanode.err.log` |
 
 Service commands:
 ```sh
-rc-service node start/stop/restart/status
+rc-service remnanode start/stop/restart/status
 ```
 
 ## Deploy workflow
@@ -24,9 +26,9 @@ rc-service node start/stop/restart/status
 cd remnanode && make build-linux
 
 # 2. Stop service, upload binary, start
-ssh -p 50413 root@103.179.44.9 "rc-service node stop"
-scp -P 50413 bin/remnanode-linux-amd64 root@103.179.44.9:/root/remnanode
-ssh -p 50413 root@103.179.44.9 "chmod +x /root/remnanode && rc-service node start"
+ssh -p 50413 root@103.179.44.9 "rc-service remnanode stop"
+scp -P 50413 bin/remnanode-linux-amd64 root@103.179.44.9:/tmp/remnanode-new
+ssh -p 50413 root@103.179.44.9 "install -m 755 /tmp/remnanode-new /usr/local/bin/remnanode && rc-service remnanode start"
 ```
 
 To update rw-core (download locally, upload — server cannot reach GitHub directly):
@@ -54,6 +56,7 @@ ssh -p 50413 root@103.179.44.9 "chmod +x /tmp/xray-new && mv /tmp/xray-new /usr/
 - Added stats endpoints: `get-user-ip-list`, `get-users-ip-list` (xray `GetStatsOnlineIpList` gRPC)
 - Config: `XTLS_API_PORT` is now canonical; `XTLS_IP` removed (always `127.0.0.1`)
 - Deployed rw-core v25.12.8 → v26.3.27
+- Test server service migrated from legacy `node` + `/root/remnanode` to `remnanode` + `/usr/local/bin/remnanode` (2026-05-03)
 
 ## Known gaps vs TypeScript
 

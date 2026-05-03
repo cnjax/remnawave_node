@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -13,16 +14,16 @@ import (
 
 // Service handles user management operations
 type Service struct {
-	xrayClient           *xray_client.Client
-	stateManager         *state.Manager
+	xrayClient            *xray_client.Client
+	stateManager          *state.Manager
 	disableHashedSetCheck bool
 }
 
 // NewService creates a new handler service
 func NewService(xrayClient *xray_client.Client, stateManager *state.Manager, disableHashedSetCheck bool) *Service {
 	return &Service{
-		xrayClient:           xrayClient,
-		stateManager:         stateManager,
+		xrayClient:            xrayClient,
+		stateManager:          stateManager,
 		disableHashedSetCheck: disableHashedSetCheck,
 	}
 }
@@ -188,6 +189,9 @@ func (s *Service) AddUsers(req *AddUsersRequest) (*AddUserResponse, error) {
 		Strs("inbounds", req.AffectedInboundTags).
 		Msg("Adding users to inbounds")
 
+	successCount := 0
+	failures := make([]string, 0)
+
 	for _, user := range req.Users {
 		// Remove user from all inbounds first
 		for _, tag := range s.stateManager.GetXtlsConfigInbounds() {
@@ -216,7 +220,22 @@ func (s *Service) AddUsers(req *AddUsersRequest) (*AddUserResponse, error) {
 			if err == nil && !s.disableHashedSetCheck {
 				s.stateManager.AddUserToInbound(inbound.Tag, user.UserData.VlessUUID)
 			}
+			if err != nil {
+				msg := fmt.Sprintf("user=%s tag=%s type=%s: %v", user.UserData.UserID, inbound.Tag, inbound.Type, err)
+				failures = append(failures, msg)
+				log.Warn().Err(err).
+					Str("userId", user.UserData.UserID).
+					Str("tag", inbound.Tag).
+					Str("type", string(inbound.Type)).
+					Msg("Failed to add user to inbound")
+			} else {
+				successCount++
+			}
 		}
+	}
+
+	if successCount == 0 && len(failures) > 0 {
+		return &AddUserResponse{Success: false, Error: strPtr(strings.Join(failures, "; "))}, nil
 	}
 
 	return &AddUserResponse{Success: true, Error: nil}, nil
@@ -270,8 +289,8 @@ func (s *Service) GetInboundUsers(tag string) (*GetInboundUsersResponse, error) 
 	for i, u := range users {
 		result[i] = InboundUser{
 			Username: u.Username,
-			Email:    u.Email,
 			Level:    u.Level,
+			Protocol: u.Protocol,
 		}
 	}
 

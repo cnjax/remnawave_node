@@ -11,29 +11,35 @@ func GenerateAPIConfig(config map[string]interface{}) map[string]interface{} {
 		config = make(map[string]interface{})
 	}
 
-	// Add stats configuration if not present
-	if _, exists := config["stats"]; !exists {
-		log.Info().Msg("Adding stats configuration")
-		config["stats"] = map[string]interface{}{}
-	}
+	fullConfig := cloneMap(config)
 
-	// Add API configuration
-	config["api"] = map[string]interface{}{
-		"tag": "api",
+	fullConfig["stats"] = map[string]interface{}{}
+	fullConfig["api"] = map[string]interface{}{
 		"services": []string{
 			"HandlerService",
 			"StatsService",
 			"RoutingService",
 		},
+		"listen": "127.0.0.1:61000",
+		"tag":    "REMNAWAVE_API",
 	}
 
-	// Add policy configuration for system stats
+	level0 := map[string]interface{}{}
+	if policyConfig, ok := fullConfig["policy"].(map[string]interface{}); ok {
+		if levels, ok := policyConfig["levels"].(map[string]interface{}); ok {
+			if existingLevel0, ok := levels["0"].(map[string]interface{}); ok {
+				level0 = cloneMap(existingLevel0)
+			}
+		}
+	}
+
+	level0["statsUserUplink"] = true
+	level0["statsUserDownlink"] = true
+	level0["statsUserOnline"] = false
+
 	policy := map[string]interface{}{
 		"levels": map[string]interface{}{
-			"0": map[string]interface{}{
-				"statsUserUplink":   true,
-				"statsUserDownlink": true,
-			},
+			"0": level0,
 		},
 		"system": map[string]interface{}{
 			"statsInboundUplink":    true,
@@ -42,73 +48,35 @@ func GenerateAPIConfig(config map[string]interface{}) map[string]interface{} {
 			"statsOutboundDownlink": true,
 		},
 	}
-	config["policy"] = policy
-
-	// Add API inbound if not present
-	inbounds, ok := config["inbounds"].([]interface{})
-	if !ok {
-		inbounds = []interface{}{}
-	}
-
-	// Check if API inbound already exists
-	hasAPIInbound := false
-	for _, inbound := range inbounds {
-		if inboundMap, ok := inbound.(map[string]interface{}); ok {
-			if tag, ok := inboundMap["tag"].(string); ok && tag == "api" {
-				hasAPIInbound = true
-				break
-			}
-		}
-	}
-
-	if !hasAPIInbound {
-		apiInbound := map[string]interface{}{
-			"tag":      "api",
-			"listen":   "127.0.0.1",
-			"port":     61000,
-			"protocol": "dokodemo-door",
-			"settings": map[string]interface{}{
-				"address": "127.0.0.1",
-			},
-		}
-		inbounds = append([]interface{}{apiInbound}, inbounds...)
-		config["inbounds"] = inbounds
-	}
-
-	// Add routing rules for API
-	routing, ok := config["routing"].(map[string]interface{})
-	if !ok {
-		routing = map[string]interface{}{}
-	}
-
-	rules, ok := routing["rules"].([]interface{})
-	if !ok {
-		rules = []interface{}{}
-	}
-
-	// Check if API rule already exists
-	hasAPIRule := false
-	for _, rule := range rules {
-		if ruleMap, ok := rule.(map[string]interface{}); ok {
-			if tag, ok := ruleMap["outboundTag"].(string); ok && tag == "api" {
-				hasAPIRule = true
-				break
-			}
-		}
-	}
-
-	if !hasAPIRule {
-		apiRule := map[string]interface{}{
-			"inboundTag":  []string{"api"},
-			"outboundTag": "api",
-			"type":        "field",
-		}
-		rules = append([]interface{}{apiRule}, rules...)
-	}
-
-	routing["rules"] = rules
-	config["routing"] = routing
+	fullConfig["policy"] = policy
 
 	log.Info().Msg("GenerateAPIConfig completed successfully")
-	return config
+	return fullConfig
+}
+
+func cloneMap(src map[string]interface{}) map[string]interface{} {
+	dst := make(map[string]interface{}, len(src))
+	for k, v := range src {
+		dst[k] = cloneValue(v)
+	}
+	return dst
+}
+
+func cloneSlice(src []interface{}) []interface{} {
+	dst := make([]interface{}, len(src))
+	for i, v := range src {
+		dst[i] = cloneValue(v)
+	}
+	return dst
+}
+
+func cloneValue(v interface{}) interface{} {
+	switch typed := v.(type) {
+	case map[string]interface{}:
+		return cloneMap(typed)
+	case []interface{}:
+		return cloneSlice(typed)
+	default:
+		return typed
+	}
 }

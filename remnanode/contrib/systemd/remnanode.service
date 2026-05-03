@@ -1,0 +1,20 @@
+[Unit]
+Description=Remnawave Node (Go)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+# Environment file uses systemd's native convention.
+EnvironmentFile=-/etc/remnanode/remnanode.env
+ExecStart=/usr/local/bin/remnanode
+Restart=on-failure
+RestartSec=3s
+LimitNOFILE=1048576
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target

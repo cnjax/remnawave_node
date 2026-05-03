@@ -187,12 +187,16 @@ func (s *Service) StartXray(req *StartXrayRequest, clientIP string) (resp *Start
 
 	if !isStarted {
 		s.isXrayOnline = false
+		errMsg := "Xray failed to start after retries"
+		if diagnostics := s.processManager.Diagnostics(); diagnostics != "" {
+			errMsg = errMsg + ": " + diagnostics
+		}
 		log.Error().
 			Str("version", s.xrayVersion).
 			Str("masterIP", clientIP).
+			Str("diagnostics", s.processManager.Diagnostics()).
 			Msg("Xray failed to start")
 
-		errMsg := "Xray failed to start after retries"
 		return &StartXrayResponse{
 			IsStarted:         false,
 			Version:           &s.xrayVersion,

@@ -3,9 +3,12 @@ package config
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
+
+var semverCoercePattern = regexp.MustCompile(`\d+(?:\.\d+){0,2}`)
 
 // LoadConfig loads configuration from environment variables
 func LoadConfig() (*Config, error) {
@@ -37,7 +40,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	// Get Xray core version
-	xrayCoreVersion := os.Getenv("XRAY_CORE_VERSION")
+	xrayCoreVersion := coerceSemver(os.Getenv("XRAY_CORE_VERSION"))
 
 	// Get Xray binary path (default: /usr/local/bin/rw-core)
 	xrayBinaryPath := getEnvOrDefault("XRAY_BINARY_PATH", "/usr/local/bin/rw-core")
@@ -56,6 +59,19 @@ func LoadConfig() (*Config, error) {
 		},
 		JWTPublicKey: payload.JWTPublicKey,
 	}, nil
+}
+
+func coerceSemver(raw string) string {
+	version := semverCoercePattern.FindString(raw)
+	if version == "" {
+		return ""
+	}
+
+	parts := strings.Split(version, ".")
+	for len(parts) < 3 {
+		parts = append(parts, "0")
+	}
+	return strings.Join(parts[:3], ".")
 }
 
 // getEnvOrDefault returns the environment variable value or a default

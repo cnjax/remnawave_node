@@ -19,12 +19,12 @@ import (
 type CipherType int32
 
 const (
-	CipherTypeUnknown         CipherType = 0
-	CipherTypeAES128GCM       CipherType = 5
-	CipherTypeAES256GCM       CipherType = 6
-	CipherTypeCHACHA20POLY1305 CipherType = 7
+	CipherTypeUnknown           CipherType = 0
+	CipherTypeAES128GCM         CipherType = 5
+	CipherTypeAES256GCM         CipherType = 6
+	CipherTypeCHACHA20POLY1305  CipherType = 7
 	CipherTypeXCHACHA20POLY1305 CipherType = 8
-	CipherTypeNone            CipherType = 9
+	CipherTypeNone              CipherType = 9
 )
 
 // AddVlessUser adds a VLESS user to an inbound
@@ -143,6 +143,7 @@ type InboundUser struct {
 	Username string
 	Email    string
 	Level    uint32
+	Protocol string
 }
 
 // GetInboundUsers gets all users in an inbound

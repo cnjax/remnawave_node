@@ -1,0 +1,17 @@
+#!/sbin/openrc-run
+
+name="remnanode"
+description="Remnawave Node (Go)"
+command="/usr/local/bin/remnanode"
+command_background="yes"
+pidfile="/run/${RC_SVCNAME}.pid"
+output_log="/var/log/remnanode.log"
+error_log="/var/log/remnanode.err.log"
+
+# Put SECRET_KEY, NODE_PORT, XRAY_CORE_VERSION, and related variables in:
+#   /etc/conf.d/remnanode
+
+depend() {
+	need net
+	after firewall
+}
