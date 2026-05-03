@@ -35,7 +35,8 @@
 - 新增 `INTERNAL_REST_TOKEN` 必填环境变量（`config/env.go`）；
 - 新增 `middleware.TokenAuth(token)` 中间件，token 不匹配时 hijack+close（`middleware/port_guard.go`）；
 - 内部路由器统一应用 `TokenAuth` 中间件（`server/server.go`）；
-- 新增 `POST /internal/webhook` 端点（接收 body、记录日志、丢弃）（`internal_api/handler.go`、`routes.go`）。
+- 新增 `POST /internal/webhook` 端点（接收 body、记录日志、丢弃）（`internal_api/handler.go`、`routes.go`）；
+- **Bug fix**：传给 xray 的 config URL 必须含 `?token=INTERNAL_REST_TOKEN`，否则 `TokenAuth` 会 hijack 连接，xray 以 EOF 退出（exit 23）。已在 `cmd/remnanode/main.go` 修复。
 
 ### ✅ 4. `StartXrayResponse` 字段 `systemInformation` → `system`，补全 stats/interface
 
@@ -183,6 +184,7 @@ TS 没有这两个端点。保留为 Go 扩展，见 P3。
 | 新增 user types `shadowsocks22`/`hysteria` | 实现已按 §5/§17 修复。 |
 | `SUPERVISORD_*` 环境变量 | Go 不需要。 |
 | `XRAY_BINARY_PATH` 默认 | TS 默认 `/usr/local/bin/xray`，Go 默认 `/usr/local/bin/rw-core`（有意改名）。 |
+| `DEBUG` 请求日志 | Go-only：`DEBUG=true` 时记录每条 API 请求/响应体（含 gzip 解压），方便排障。TS 无此功能。 |
 
 ---
 
