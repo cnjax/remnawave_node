@@ -14,6 +14,7 @@ import (
 	"github.com/remnawave/remnanode/internal/config"
 	"github.com/remnawave/remnanode/internal/handler"
 	internalapi "github.com/remnawave/remnanode/internal/internal_api"
+	"github.com/remnawave/remnanode/internal/plugin"
 	"github.com/remnawave/remnanode/internal/process"
 	"github.com/remnawave/remnanode/internal/server"
 	"github.com/remnawave/remnanode/internal/state"
@@ -68,6 +69,10 @@ func main() {
 	handlerService := handler.NewService(xrayClient, stateManager, cfg.DisableHashedSetCheck)
 	statsService := stats.NewService(xrayClient)
 	xrayService := xray.NewService(xrayClient, processManager, stateManager, cfg, nodeVersion)
+	pluginService := plugin.NewService(func() error {
+		_, err := xrayService.StopXray()
+		return err
+	})
 	visionService := vision.NewService(xrayClient)
 	internalAPIService := internalapi.NewService(stateManager)
 
@@ -75,6 +80,7 @@ func main() {
 	handlerHandler := handler.NewHandler(handlerService)
 	statsHandler := stats.NewHandler(statsService)
 	xrayHandler := xray.NewHandler(xrayService)
+	pluginHandler := plugin.NewHandler(pluginService)
 	visionHandler := vision.NewHandler(visionService)
 	internalAPIHandler := internalapi.NewHandler(internalAPIService)
 
@@ -83,6 +89,7 @@ func main() {
 		Handler:     handlerHandler,
 		Stats:       statsHandler,
 		Xray:        xrayHandler,
+		Plugin:      pluginHandler,
 		Vision:      visionHandler,
 		InternalAPI: internalAPIHandler,
 	}

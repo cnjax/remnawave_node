@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/remnawave/remnanode/internal/xray_client"
+	"github.com/remnawave/remnanode/pkg/sysinfo"
 )
 
 // Service handles statistics operations
@@ -27,17 +28,33 @@ func (s *Service) GetSystemStats() (*GetSystemStatsResponse, error) {
 		return nil, err
 	}
 
+	systemStats, err := sysinfo.GetSystemStats()
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to get node system stats")
+		return nil, err
+	}
+
 	return &GetSystemStatsResponse{
-		NumGoroutine: rawStats.NumGoroutine,
-		NumGC:        rawStats.NumGC,
-		Alloc:        rawStats.Alloc,
-		TotalAlloc:   rawStats.TotalAlloc,
-		Sys:          rawStats.Sys,
-		Mallocs:      rawStats.Mallocs,
-		Frees:        rawStats.Frees,
-		LiveObjects:  rawStats.LiveObjects,
-		PauseTotalNs: rawStats.PauseTotalNs,
-		Uptime:       rawStats.Uptime,
+		XrayInfo: &XrayInfo{
+			NumGoroutine: rawStats.NumGoroutine,
+			NumGC:        rawStats.NumGC,
+			Alloc:        rawStats.Alloc,
+			TotalAlloc:   rawStats.TotalAlloc,
+			Sys:          rawStats.Sys,
+			Mallocs:      rawStats.Mallocs,
+			Frees:        rawStats.Frees,
+			LiveObjects:  rawStats.LiveObjects,
+			PauseTotalNs: rawStats.PauseTotalNs,
+			Uptime:       rawStats.Uptime,
+		},
+		Plugins: PluginStats{
+			TorrentBlocker: TorrentBlockerStats{
+				ReportsCount: 0,
+			},
+		},
+		System: SystemStatsContainer{
+			Stats: systemStats,
+		},
 	}, nil
 }
 

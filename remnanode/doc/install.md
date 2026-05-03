@@ -144,6 +144,39 @@ Startup sequence:
 
 This ordering is intentional. If `rw-core` starts before the panel provides config, it receives `{}` and exits.
 
+## Failure Diagnostics
+
+`remnanode` logs failed API requests with bounded request/response body prefixes. This is enabled in production and helps correlate service errors with the exact API call.
+
+Failure logs include:
+
+```text
+method
+path
+query
+status
+latency
+ip
+user_agent
+request_body
+request_body_truncated
+response_body
+response_body_truncated
+```
+
+Only failed calls are logged:
+- HTTP status `>= 400`
+- command responses such as `isStarted=false`, `isStopped=false`, or `success=false`
+- responses with non-null JSON `error` fields
+
+Body capture is limited to 8 KiB. Common sensitive JSON fields such as `secret`, `token`, `password`, `uuid`, `vlessUuid`, `trojanPassword`, `ssPassword`, `id`, and `key` are redacted before logging.
+
+Example:
+
+```text
+WRN api request failed method=GET path=/node/stats/get-system-stats status=500 response_body="{\"timestamp\":\"...\",\"path\":\"/node/stats/get-system-stats\",\"message\":\"Failed to get system stats\",\"errorCode\":\"A009\"}"
+```
+
 ## Rollback
 
 Keep a backup before replacing binaries or init scripts:

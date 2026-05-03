@@ -32,6 +32,7 @@ type Services struct {
 	Stats       interface{}
 	Xray        interface{}
 	Vision      interface{}
+	Plugin      interface{}
 	InternalAPI interface{}
 }
 
@@ -48,6 +49,7 @@ func New(cfg *config.Config, services *Services) (*Server, error) {
 	mainRouter.Use(middleware.SecureHeaders())
 	mainRouter.Use(middleware.BodyLimit(bodyLimitBytes))
 	mainRouter.Use(middleware.GzipDecompress()) // Decompress gzip request bodies
+	mainRouter.Use(middleware.APIDiagnostics())
 	if config.IsDevelopment() {
 		mainRouter.Use(middleware.Logger())
 	}
@@ -61,6 +63,7 @@ func New(cfg *config.Config, services *Services) (*Server, error) {
 	internalRouter.Use(middleware.Recovery())
 	internalRouter.Use(middleware.BodyLimit(bodyLimitBytes))
 	internalRouter.Use(middleware.InternalOnly())
+	internalRouter.Use(middleware.APIDiagnostics())
 	// Internal router also ignores proxy headers — it only accepts localhost connections.
 	if err := internalRouter.SetTrustedProxies(nil); err != nil {
 		return nil, fmt.Errorf("failed to set trusted proxies on internal router: %w", err)

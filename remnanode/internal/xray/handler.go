@@ -45,33 +45,45 @@ func (h *Handler) Start(c *gin.Context) {
 
 // Stop handles GET /node/xray/stop
 func (h *Handler) Stop(c *gin.Context) {
+	log.Info().Str("clientIP", c.ClientIP()).Msg("Xray stop requested")
 	resp, err := h.service.StopXray()
 	if err != nil {
+		log.Error().Err(err).Msg("StopXray service error")
 		errors.SendError(c, errors.ErrInternalServer)
 		return
 	}
 
+	log.Info().Bool("is_stopped", resp.IsStopped).Msg("Xray stop response")
 	errors.SendSuccess(c, resp)
 }
 
 // GetStatus handles GET /node/xray/status
 func (h *Handler) GetStatus(c *gin.Context) {
+	log.Info().Str("clientIP", c.ClientIP()).Msg("Xray status requested")
 	resp, err := h.service.GetStatus()
 	if err != nil {
+		log.Error().Err(err).Msg("GetStatus service error")
 		errors.SendError(c, errors.ErrInternalServer)
 		return
 	}
 
+	log.Info().Bool("is_running", resp.IsRunning).Str("version", resp.Version).Msg("Xray status response")
 	errors.SendSuccess(c, resp)
 }
 
 // GetNodeHealthCheck handles GET /node/xray/node-health-check
 func (h *Handler) GetNodeHealthCheck(c *gin.Context) {
+	log.Info().Str("clientIP", c.ClientIP()).Msg("Xray healthcheck requested")
 	resp, err := h.service.GetNodeHealthCheck()
 	if err != nil {
+		log.Error().Err(err).Msg("GetNodeHealthCheck service error")
 		errors.SendError(c, errors.ErrInternalServer)
 		return
 	}
 
+	log.Info().
+		Bool("is_alive", resp.IsAlive).
+		Bool("xray_internal_status_cached", resp.XrayInternalStatusCached).
+		Msg("Xray healthcheck response")
 	errors.SendSuccess(c, resp)
 }

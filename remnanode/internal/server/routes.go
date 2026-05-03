@@ -8,6 +8,7 @@ import (
 	"github.com/remnawave/remnanode/internal/errors"
 	"github.com/remnawave/remnanode/internal/handler"
 	internalapi "github.com/remnawave/remnanode/internal/internal_api"
+	"github.com/remnawave/remnanode/internal/plugin"
 	"github.com/remnawave/remnanode/internal/server/middleware"
 	"github.com/remnawave/remnanode/internal/stats"
 	"github.com/remnawave/remnanode/internal/vision"
@@ -36,6 +37,10 @@ func (s *Server) setupRoutes() {
 	// Xray routes - process management
 	xrayGroup := nodeGroup.Group("/xray")
 	s.setupXrayRoutes(xrayGroup)
+
+	// Plugin routes - panel plugin synchronization
+	pluginGroup := nodeGroup.Group("/plugin")
+	s.setupPluginRoutes(pluginGroup)
 
 	// Internal router routes (no JWT, but localhost only)
 	s.setupInternalRoutes()
@@ -113,6 +118,17 @@ func (s *Server) setupXrayRoutes(group *gin.RouterGroup) {
 	group.GET("/stop", x.Stop)
 	group.GET("/status", x.GetStatus)
 	group.GET("/healthcheck", x.GetNodeHealthCheck)
+}
+
+// setupPluginRoutes configures plugin module routes
+func (s *Server) setupPluginRoutes(group *gin.RouterGroup) {
+	p, ok := s.services.Plugin.(*plugin.Handler)
+	if !ok || p == nil {
+		group.POST("/sync", notImplemented)
+		return
+	}
+
+	group.POST("/sync", p.Sync)
 }
 
 // setupInternalRoutes configures internal API routes (localhost only)

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/remnawave/remnanode/internal/xray_client"
+	"github.com/remnawave/remnanode/pkg/sysinfo"
 )
 
 // XrayInfo holds xray process statistics
@@ -20,8 +21,26 @@ type XrayInfo struct {
 	Uptime       uint32 `json:"uptime"`
 }
 
-// GetSystemStatsResponse matches the current TS runtime response shape.
-type GetSystemStatsResponse = XrayInfo
+// PluginStats matches the current TS plugin stats response shape.
+type PluginStats struct {
+	TorrentBlocker TorrentBlockerStats `json:"torrentBlocker"`
+}
+
+type TorrentBlockerStats struct {
+	ReportsCount int `json:"reportsCount"`
+}
+
+type SystemStatsContainer struct {
+	Stats *sysinfo.SystemStats `json:"stats"`
+}
+
+// GetSystemStatsResponse matches the current upstream TS contract:
+// { xrayInfo, plugins, system: { stats } }.
+type GetSystemStatsResponse struct {
+	XrayInfo *XrayInfo            `json:"xrayInfo"`
+	Plugins  PluginStats          `json:"plugins"`
+	System   SystemStatsContainer `json:"system"`
+}
 
 // GetUserOnlineStatusResponse represents the response for user online status.
 // Field name matches the TS contract (libs/contract/commands/stats/get-user-online-status.command.ts).
